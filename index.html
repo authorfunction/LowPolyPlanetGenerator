@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Low Poly Planet - Preset System</title>
+    <title>Low Poly Planet - Solar Effects</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       body {
@@ -522,6 +522,35 @@
               id="vib"
             />
 
+            <!-- Separate Tint Sliders -->
+            <div class="flex justify-between mb-1 mt-2">
+              <label class="text-xs text-yellow-200">Rise Tint Strength</label>
+              <span id="val-risetint" class="text-xs text-gray-500">0.5</span>
+            </div>
+            <input
+              type="range"
+              min="0.0"
+              max="2.0"
+              step="0.1"
+              value="0.5"
+              class="slider"
+              id="risetint"
+            />
+
+            <div class="flex justify-between mb-1 mt-2">
+              <label class="text-xs text-red-200">Set Tint Strength</label>
+              <span id="val-settint" class="text-xs text-gray-500">0.8</span>
+            </div>
+            <input
+              type="range"
+              min="0.0"
+              max="2.0"
+              step="0.1"
+              value="0.8"
+              class="slider"
+              id="settint"
+            />
+
             <!-- New Temp Controls -->
             <div class="flex justify-between mb-1 mt-2">
               <label class="text-xs text-blue-300">Sunrise Temp</label>
@@ -962,6 +991,8 @@
         colorVibrance: 2.0,
         sunriseTemp: 0.8,
         sunsetTemp: 0.55,
+        sunriseTintStrength: 0.5, // New Param
+        sunsetTintStrength: 0.8, // New Param
       };
 
       // Working parameters (initialized to default)
@@ -1109,6 +1140,55 @@
           );
         };
       }
+
+      // --- CUSTOM SUN SHADER DEFINITIONS ---
+      const SUN_VERTEX = `
+          uniform float uTime;
+          uniform float uSunSide;
+          uniform float uSunsetFactor; // Intensity of sunset
+          uniform float uDistortion;
+          uniform float uSolarEnabled;
+          varying vec2 vUv;
+          varying vec3 vNormal;
+
+          void main() {
+              vUv = uv;
+              vNormal = normal;
+              vec3 pos = position;
+
+              // Apply vertex distortion only if enabled and on sunset side (uSunSide > 0)
+              // We use uSunSide (direction) to check if we are setting
+              // We use uSunsetFactor (intensity) to scale the effect
+              if (uSolarEnabled > 0.5 && uSunSide > 0.0) {
+                  float noise = sin(pos.y * 10.0 + uTime * 5.0) * cos(pos.x * 10.0 + uTime * 4.0) * 0.02;
+
+                  // Scale distortion significantly (500.0) so it is visible
+                  pos += normal * noise * uDistortion * 500.0 * uSunsetFactor;
+              }
+
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+          }
+      `;
+
+      const SUN_FRAGMENT = `
+          uniform vec3 uColor; // Base yellow/white
+          uniform vec3 uTint;  // Calculated tint (Sunrise/Sunset color)
+          uniform float uMixAmount; // How much to tint
+          uniform float uBrightness;
+          uniform float uSolarEnabled;
+
+          void main() {
+              vec3 finalColor = uColor;
+
+              // Mix base color with tint if solar effects enabled
+              if (uSolarEnabled > 0.5) {
+                 finalColor = mix(uColor, uTint, uMixAmount);
+              }
+
+              // Output
+              gl_FragColor = vec4(finalColor * uBrightness, 1.0);
+          }
+      `;
 
       // --- EXISTING SHADERS ---
       const ATMO_VERTEX = `
@@ -1495,8 +1575,27 @@
       const sunOrbit = new THREE.Group();
       scene.add(sunOrbit);
 
-      const sunGeo = new THREE.IcosahedronGeometry(1.5, 1);
-      const sunMat = new THREE.MeshBasicMaterial({ color: 0xffdd00 });
+      const sunGeo = new THREE.IcosahedronGeometry(1.5, 4); // Increased detail for shader wobble
+
+      // --- REPLACED MESH BASIC MATERIAL WITH SHADER MATERIAL ---
+      const sunMat = new THREE.ShaderMaterial({
+        uniforms: {
+          uColor: { value: new THREE.Color(0xffdd00) },
+          uTint: { value: new THREE.Color(0xff4400) }, // Dynamic
+          uMixAmount: { value: 0.0 },
+          uBrightness: { value: 3.0 },
+          uTime: { value: 0.0 },
+          uSunSide: { value: 0.0 },
+          uSunsetFactor: { value: 0.0 },
+          uDistortion: { value: 0.0 },
+          uSolarEnabled: { value: 1.0 },
+        },
+        vertexShader: SUN_VERTEX,
+        fragmentShader: SUN_FRAGMENT,
+        side: THREE.FrontSide,
+      });
+      // ---------------------------------------------------------
+
       const sunMesh = new THREE.Mesh(sunGeo, sunMat);
       sunMesh.position.set(25, 5, 0);
       sunOrbit.add(sunMesh);
@@ -2339,6 +2438,8 @@
         solar: document.getElementById("solar-enabled"),
         sunrise: document.getElementById("sunrise-temp"),
         sunset: document.getElementById("sunset-temp"),
+        riseTint: document.getElementById("risetint"), // Updated
+        setTint: document.getElementById("settint"), // Updated
       };
 
       const displays = {
@@ -2374,6 +2475,8 @@
         wHeight: document.getElementById("val-wheight"),
         hazeDist: document.getElementById("val-haze-dist"),
         vib: document.getElementById("val-vib"),
+        riseTint: document.getElementById("val-risetint"), // Updated
+        setTint: document.getElementById("val-settint"), // Updated
       };
 
       // Toggle Control Logic
@@ -2436,7 +2539,9 @@
               key !== "waveHeight" &&
               key !== "cycleFlip" &&
               key !== "sunriseTemp" &&
-              key !== "sunsetTemp")
+              key !== "sunsetTemp" &&
+              key !== "sunriseTintStrength" &&
+              key !== "sunsetTintStrength")
           ) {
             if (key === "starDensity") generateStars();
             else updatePlanet();
@@ -2544,6 +2649,8 @@
         setVal(ui.vib, PARAMS.colorVibrance, displays.vib);
         setVal(ui.sunrise, PARAMS.sunriseTemp, null);
         setVal(ui.sunset, PARAMS.sunsetTemp, null);
+        setVal(ui.riseTint, PARAMS.sunriseTintStrength, displays.riseTint);
+        setVal(ui.setTint, PARAMS.sunsetTintStrength, displays.setTint);
 
         setVal(ui.htoggle, PARAMS.hazeEnabled);
         setVal(ui.flip, PARAMS.cycleFlip);
@@ -2768,6 +2875,8 @@
       bindInput("colorVibrance", ui.vib, displays.vib);
       bindInput("sunriseTemp", ui.sunrise, null);
       bindInput("sunsetTemp", ui.sunset, null);
+      bindInput("sunriseTintStrength", ui.riseTint, displays.riseTint);
+      bindInput("sunsetTintStrength", ui.setTint, displays.setTint);
 
       bindInput("cloudCoverage", ui.cCov, displays.cCov, true);
       bindInput("cloudAltitude", ui.cAlt, displays.cAlt);
@@ -2847,16 +2956,13 @@
           vecToSun.subVectors(sunWorldPos, camPos);
           vecToPlanet.subVectors(new THREE.Vector3(0, 0, 0), camPos);
 
-          // --- NEW: CALCULATE SUN SIDE FOR SUNRISE/SUNSET DISTINCTION ---
-          // We cross view dir with up vector to get "Right"
+          // --- CALCULATE SUN SIDE FOR SUNRISE/SUNSET DISTINCTION ---
           const viewDir = vecToPlanet.clone().negate().normalize();
           const camRight = new THREE.Vector3()
             .crossVectors(viewDir, camera.up)
             .normalize();
           const sunDir = sunWorldPos.clone().normalize();
 
-          // Dot product tells us if sun is on right (>0) or left (<0)
-          // Assuming standard rotation, Right=West(Set), Left=East(Rise)
           let sunSide = camRight.dot(sunDir);
 
           if (PARAMS.cycleFlip) {
@@ -2899,235 +3005,53 @@
             mat.uniforms.sunsetColor.value.copy(currentSunset);
           });
 
-          let sunColor = baseSunColor.clone();
-          sunColor.lerp(currentSunset, sunsetFactor); // Use dynamic sunset color for sun mesh too
-          sunColor.multiplyScalar(PARAMS.sunBrightness);
-          sunMat.color.copy(sunColor);
-        }
+          // --- NEW SUN SPHERE COLOR LOGIC ---
+          // 1. Determine target tint color based on side
+          //    -0.5 -> Sunrise, +0.5 -> Sunset
+          const sideBlend = THREE.MathUtils.smoothstep(sunSide, -0.5, 0.5);
+          const targetTint = currentSunrise
+            .clone()
+            .lerp(currentSunset, sideBlend);
 
-        if (cloudsMesh && !isPaused) {
-          const cloudsRotation = cloudsMesh.rotation.y;
-
-          cloudsMesh.children.forEach((cloud) => {
-            cloud.rotation.z += cloud.userData.rotSpeed * delta;
-            const bob =
-              Math.sin(
-                time * cloud.userData.bobSpeed + cloud.userData.bobOffset,
-              ) * 0.05;
-            const r = cloud.userData.baseRadius + bob;
-            cloud.position.setLength(r);
-
-            if (currentSimplex) {
-              tempVec.copy(cloud.position).normalize().multiplyScalar(4.0);
-              tempVec.applyAxisAngle(
-                new THREE.Vector3(0, 1, 0),
-                cloudsRotation,
-              );
-              const x = tempVec.x;
-              const y = tempVec.y;
-              const z = tempVec.z;
-              const n1 = currentSimplex.noise(
-                x * PARAMS.scale * 0.1,
-                y * PARAMS.scale * 0.1,
-                z * PARAMS.scale * 0.1,
-              );
-              const n2 =
-                currentSimplex.noise(
-                  x * PARAMS.scale * 0.3,
-                  y * PARAMS.scale * 0.3,
-                  z * PARAMS.scale * 0.3,
-                ) * 0.5;
-              const n3 =
-                currentSimplex.noise(
-                  x * PARAMS.scale * 1.0,
-                  y * PARAMS.scale * 1.0,
-                  z * PARAMS.scale * 1.0,
-                ) * 0.2;
-              let noiseVal = Math.max(-0.5, n1 + n2 + n3);
-              const displacement = 1 + noiseVal * PARAMS.height * 0.2;
-              const surfaceH = (displacement * 4 - 4.0) / (PARAMS.height * 0.8);
-
-              let targetScale = 1.0;
-              let raining = false;
-              if (surfaceH > 0.6) {
-                raining = true;
-                targetScale = 0.2;
-              }
-
-              cloud.userData.currentScale = THREE.MathUtils.lerp(
-                cloud.userData.currentScale,
-                targetScale,
-                delta * 0.5,
-              );
-              const s = cloud.userData.currentScale;
-              cloud.scale.set(s, s, s);
-
-              const rainGroup = cloud.userData.rainGroup;
-              if (rainGroup) {
-                if (raining && s > 0.2) {
-                  rainGroup.visible = true;
-                  rainGroup.children.forEach((drop) => {
-                    drop.position.z += drop.userData.speed * delta * 3.0;
-                    if (drop.position.z > 2.5)
-                      drop.position.z = -0.1 - Math.random() * 0.2;
-                  });
-                } else {
-                  rainGroup.visible = false;
-                }
-              }
-            }
-          });
-        }
-
-        if (sam && algen && planetMesh && !isPaused) {
-          // 1. Update SAM
-          if (samState.stuckTimer > 5.0) {
-            const d = sam.position.distanceTo(samState.lastPos);
-            if (d < 1.0) {
-              samState.idleTime = 0;
-              samState.wanderAngle += Math.PI;
-              samState.stuckTimer = 0;
-            } else {
-              samState.lastPos.copy(sam.position);
-              samState.stuckTimer = 0;
-            }
-          } else {
-            samState.stuckTimer += delta;
-          }
-
-          if (samState.idleTime > 0) {
-            samState.idleTime -= delta;
-          } else {
-            const dPhi = samState.targetPhi - samState.phi;
-            let dTheta = samState.targetTheta - samState.theta;
-
-            if (dTheta > Math.PI) dTheta -= Math.PI * 2;
-            if (dTheta < -Math.PI) dTheta += Math.PI * 2;
-
-            const dist = Math.sqrt(dPhi * dPhi + dTheta * dTheta);
-
-            if (dist < 0.05) {
-              samState.wanderAngle += (Math.random() - 0.5) * 1.5;
-
-              const stepDist = 2.5 + Math.random() * 1.5;
-
-              const tp =
-                samState.phi + Math.cos(samState.wanderAngle) * stepDist;
-              const tt =
-                samState.theta + Math.sin(samState.wanderAngle) * stepDist;
-
-              samState.targetPhi = Math.max(0.1, Math.min(Math.PI - 0.1, tp));
-              samState.targetTheta = tt;
-
-              samState.idleTime = 0.2 + Math.random() * 0.5;
-            } else {
-              const speed = samState.speed * delta;
-              samState.phi += (dPhi / dist) * speed;
-              samState.theta += (dTheta / dist) * speed;
-            }
-          }
-
-          // 2. Update ÄLGEN
-          let dPhi = samState.phi - algenState.phi;
-          let dTheta = samState.theta - algenState.theta;
-          if (dTheta > Math.PI) dTheta -= Math.PI * 2;
-          if (dTheta < -Math.PI) dTheta += Math.PI * 2;
-
-          const distToSam = Math.sqrt(dPhi * dPhi + dTheta * dTheta) * 4;
-
-          if (algenState.hesitationTimer > 0) {
-            algenState.hesitationTimer -= delta;
-            algenState.moving = false;
-          } else {
-            if (distToSam > 2.0) algenState.moving = true;
-            else if (distToSam < 1.0) algenState.moving = false;
-
-            if (algenState.moving) {
-              if (Math.random() < 0.005)
-                algenState.hesitationTimer = 1.0 + Math.random() * 1.5;
-
-              const speed = algenState.speed * delta;
-              algenState.phi += dPhi * speed * 1.5;
-              algenState.theta += dTheta * speed * 1.5;
-            }
-          }
-
-          const snapCharacter = (
-            obj,
-            state,
-            lookTargetPhi,
-            lookTargetTheta,
-          ) => {
-            charPos.setFromSphericalCoords(6, state.phi, state.theta);
-            charPos.applyMatrix4(planetGroup.matrixWorld);
-            const direction = new THREE.Vector3(0, 0, 0)
-              .sub(charPos)
-              .normalize();
-
-            raycaster.set(charPos, direction);
-            const intersects = raycaster.intersectObject(planetMesh);
-
-            if (intersects.length > 0) {
-              const hit = intersects[0];
-
-              const waterRadius = 4 + PARAMS.waterLevel * PARAMS.height * 0.5;
-              const localHit = hit.point
-                .clone()
-                .applyMatrix4(planetGroup.matrixWorld.clone().invert());
-              const dist = localHit.length();
-
-              let finalPos = localHit;
-              let normal = hit.face.normal.clone().normalize();
-              let isWater = false;
-
-              if (dist < waterRadius) {
-                isWater = true;
-                finalPos.setLength(waterRadius);
-                normal.copy(finalPos).normalize();
-              }
-
-              obj.position.copy(finalPos);
-              obj.visible = true;
-
-              if (obj.userData.boat) {
-                obj.userData.boat.visible = isWater;
-                obj.userData.mesh.position.y = isWater
-                  ? obj.userData.yOffsetWater
-                  : obj.userData.yOffsetLand;
-              }
-
-              targetPos.setFromSphericalCoords(
-                4,
-                lookTargetPhi,
-                lookTargetTheta,
-              );
-              const forward = targetPos.sub(obj.position).normalize();
-              const dot = forward.dot(normal);
-              const projectedForward = forward
-                .sub(normal.clone().multiplyScalar(dot))
-                .normalize();
-
-              dummyObj.position.copy(obj.position);
-              dummyObj.up.copy(normal);
-              lookTarget.copy(obj.position).add(projectedForward);
-              dummyObj.lookAt(lookTarget);
-
-              obj.quaternion.slerp(dummyObj.quaternion, 0.1);
-            } else {
-              obj.visible = false;
-            }
-          };
-
-          snapCharacter(
-            sam,
-            samState,
-            samState.targetPhi,
-            samState.targetTheta,
+          // 2. Determine strength based on side
+          const strength = THREE.MathUtils.lerp(
+            PARAMS.sunriseTintStrength,
+            PARAMS.sunsetTintStrength,
+            sideBlend,
           );
-          snapCharacter(algen, algenState, samState.phi, samState.theta);
+
+          let sunColor = baseSunColor.clone();
+
+          // 3. Boost saturation of the target tint to make it punch through
+          //    Simple hack: multiply by vibrance before mixing
+          targetTint.multiplyScalar(PARAMS.colorVibrance);
+
+          // 4. Mix: If sunsetFactor is high (sun is deep in atmosphere), mix towards tint
+          //    We multiply sunsetFactor by strength to control the max mix amount
+          //    Using 'max' ensures we don't lose the color if factor is low but strength is high
+          //    Actually, standard lerp is best, but we boost the alpha
+          const mixAlpha = Math.min(1.0, sunsetFactor * strength * 2.5); // 2.5 multiplier for aggression
+
+          sunColor.lerp(targetTint, mixAlpha);
+
+          // 5. Apply overall brightness. If heavily tinted, we might want less blinding white brightness
+          //    so the color shows.
+          let brightness = PARAMS.sunBrightness;
+          if (mixAlpha > 0.5) brightness *= 0.8; // Dim slightly when tinted to show color
+
+          sunColor.multiplyScalar(brightness);
+          sunMat.uniforms.uColor.value.copy(baseSunColor); // Reset base to yellow
+          sunMat.uniforms.uTint.value.copy(targetTint);
+          sunMat.uniforms.uMixAmount.value = mixAlpha;
+          sunMat.uniforms.uBrightness.value = brightness;
+          sunMat.uniforms.uTime.value = time;
+          sunMat.uniforms.uSunSide.value = sunSide; // Fix: Pass direction to vertex shader
+          sunMat.uniforms.uSunsetFactor.value = sunsetFactor; // Fix: Pass intensity to vertex shader
+          sunMat.uniforms.uDistortion.value = PARAMS.hazeDistortion;
+          sunMat.uniforms.uSolarEnabled.value = PARAMS.solarEnabled ? 1.0 : 0.0;
         }
 
-        // stars.rotation.y -= delta * 0.02; // Handled via group rotation now if needed, or keep static
+        // ... rest of animate loop ...
         if (!isPaused) {
           starsGroup.rotation.y -= delta * 0.02;
         }
