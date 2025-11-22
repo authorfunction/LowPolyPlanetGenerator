@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Low Poly Planet Generator</title>
+    <title>Low Poly Planet - Dynamic Water</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       body {
@@ -270,6 +270,42 @@
             />
           </div>
 
+          <!-- New Water Controls -->
+          <div class="bg-blue-900/20 p-3 rounded-lg">
+            <label
+              class="text-xs text-blue-300 font-bold uppercase tracking-wider mb-2 block"
+              >Water Surface</label
+            >
+
+            <div class="flex justify-between mb-1">
+              <label class="text-xs text-blue-200">Wave Speed</label>
+              <span id="val-wspeed" class="text-xs text-gray-500">1.0</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="3.0"
+              step="0.1"
+              value="1.0"
+              class="slider"
+              id="wspeed"
+            />
+
+            <div class="flex justify-between mb-1 mt-2">
+              <label class="text-xs text-blue-200">Wave Height</label>
+              <span id="val-wheight" class="text-xs text-gray-500">0.05</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="0.2"
+              step="0.01"
+              value="0.05"
+              class="slider"
+              id="wheight"
+            />
+          </div>
+
           <div>
             <div class="flex justify-between mb-1">
               <label class="text-xs text-green-300">Vegetation Density</label>
@@ -292,6 +328,39 @@
             class="text-xs uppercase tracking-wider text-gray-400 font-semibold block"
             >Atmosphere & Clouds</label
           >
+
+          <!-- HORIZON FOG CONTROLS -->
+          <div class="bg-white/5 p-3 rounded-lg">
+            <div class="flex justify-between mb-1">
+              <label class="text-xs text-pink-300 font-bold"
+                >Horizon Fade (DoF)</label
+              >
+              <span id="val-h-str" class="text-xs text-gray-500">0.15</span>
+            </div>
+            <input
+              type="range"
+              min="0.0"
+              max="1.0"
+              step="0.05"
+              value="0.15"
+              class="slider"
+              id="h-str"
+            />
+
+            <div class="flex justify-between mb-1 mt-2">
+              <label class="text-xs text-pink-200">Fade Falloff</label>
+              <span id="val-h-pow" class="text-xs text-gray-500">7.0</span>
+            </div>
+            <input
+              type="range"
+              min="0.5"
+              max="8.0"
+              step="0.1"
+              value="7.0"
+              class="slider"
+              id="h-pow"
+            />
+          </div>
 
           <div>
             <div class="flex justify-between mb-1">
@@ -375,6 +444,22 @@
 
           <div>
             <div class="flex justify-between mb-1">
+              <label class="text-xs text-blue-300">Atmo Scale</label>
+              <span id="val-ascale" class="text-xs text-gray-500">1.9</span>
+            </div>
+            <input
+              type="range"
+              min="1.05"
+              max="2.0"
+              step="0.05"
+              value="1.9"
+              class="slider"
+              id="ascale"
+            />
+          </div>
+
+          <div>
+            <div class="flex justify-between mb-1">
               <label class="text-xs text-orange-300">Sunset Offset</label>
               <span id="val-soff" class="text-xs text-gray-500">0.4</span>
             </div>
@@ -407,22 +492,6 @@
 
           <div>
             <div class="flex justify-between mb-1">
-              <label class="text-xs text-blue-300">Atmo Scale</label>
-              <span id="val-ascale" class="text-xs text-gray-500">1.9</span>
-            </div>
-            <input
-              type="range"
-              min="1.05"
-              max="2.0"
-              step="0.05"
-              value="1.9"
-              class="slider"
-              id="ascale"
-            />
-          </div>
-
-          <div>
-            <div class="flex justify-between mb-1">
               <label class="text-xs text-blue-300">Halo Strength</label>
               <span id="val-halo" class="text-xs text-gray-500">1.4</span>
             </div>
@@ -437,7 +506,7 @@
             />
           </div>
 
-          <!-- New Haze Controls -->
+          <!-- Haze Controls -->
           <div class="pt-2 border-t border-white/10">
             <div class="flex justify-between items-center mb-2">
               <label
@@ -480,7 +549,6 @@
               id="hint"
             />
 
-            <!-- New Haze Falloff -->
             <div class="flex justify-between mb-1">
               <label class="text-xs text-cyan-200">Haze Falloff</label>
               <span id="val-hfall" class="text-xs text-gray-500">30.0</span>
@@ -621,19 +689,151 @@
       import * as THREE from "three";
       import { TrackballControls } from "three/addons/controls/TrackballControls.js";
 
-      // --- REVERTED ATMOSPHERE SHADER (Additive Fresnel) ---
+      // --- GLOBAL UNIFORMS ---
+      const HORIZON_UNIFORMS = {
+        uHorizonColor: { value: new THREE.Color(0x4488ff) },
+        uHorizonStrength: { value: 0.15 },
+        uHorizonPower: { value: 7.0 },
+      };
+
+      const WATER_UNIFORMS = {
+        uTime: { value: 0.0 },
+        uWaveSpeed: { value: 1.0 },
+        uWaveHeight: { value: 0.05 },
+      };
+
+      // --- SHADER INJECTION FUNCTIONS ---
+
+      // 1. Standard Horizon Fog (For Land, Trees, Clouds)
+      function setupHorizonShader(material) {
+        material.onBeforeCompile = (shader) => {
+          shader.uniforms.uHorizonColor = HORIZON_UNIFORMS.uHorizonColor;
+          shader.uniforms.uHorizonStrength = HORIZON_UNIFORMS.uHorizonStrength;
+          shader.uniforms.uHorizonPower = HORIZON_UNIFORMS.uHorizonPower;
+
+          shader.vertexShader = shader.vertexShader.replace(
+            "#include <common>",
+            `
+              #include <common>
+              varying vec3 vWorldPositionFog;
+            `,
+          );
+          shader.vertexShader = shader.vertexShader.replace(
+            "#include <worldpos_vertex>",
+            `
+              #include <worldpos_vertex>
+              vWorldPositionFog = worldPosition.xyz;
+            `,
+          );
+          shader.fragmentShader = shader.fragmentShader.replace(
+            "#include <common>",
+            `
+              #include <common>
+              varying vec3 vWorldPositionFog;
+              uniform vec3 uHorizonColor;
+              uniform float uHorizonStrength;
+              uniform float uHorizonPower;
+            `,
+          );
+          shader.fragmentShader = shader.fragmentShader.replace(
+            "#include <dithering_fragment>",
+            `
+              #include <dithering_fragment>
+              vec3 hNormal = normalize(vWorldPositionFog);
+              vec3 hView = normalize(cameraPosition - vWorldPositionFog);
+              float hDot = max(0.0, dot(hNormal, hView));
+              float hFactor = 1.0 - hDot;
+              hFactor = pow(hFactor, uHorizonPower);
+              float hIntensity = hFactor * uHorizonStrength;
+              gl_FragColor.rgb = mix(gl_FragColor.rgb, uHorizonColor, hIntensity);
+            `,
+          );
+        };
+      }
+
+      // 2. Water Shader (Horizon Fog + Dynamic Waves)
+      function setupWaterShader(material) {
+        material.onBeforeCompile = (shader) => {
+          // Include all Uniforms
+          shader.uniforms.uHorizonColor = HORIZON_UNIFORMS.uHorizonColor;
+          shader.uniforms.uHorizonStrength = HORIZON_UNIFORMS.uHorizonStrength;
+          shader.uniforms.uHorizonPower = HORIZON_UNIFORMS.uHorizonPower;
+
+          shader.uniforms.uTime = WATER_UNIFORMS.uTime;
+          shader.uniforms.uWaveSpeed = WATER_UNIFORMS.uWaveSpeed;
+          shader.uniforms.uWaveHeight = WATER_UNIFORMS.uWaveHeight;
+
+          // Vertex Logic: Add Displacement
+          shader.vertexShader = shader.vertexShader.replace(
+            "#include <common>",
+            `
+              #include <common>
+              uniform float uTime;
+              uniform float uWaveSpeed;
+              uniform float uWaveHeight;
+              varying vec3 vWorldPositionFog;
+            `,
+          );
+
+          shader.vertexShader = shader.vertexShader.replace(
+            "#include <begin_vertex>",
+            `
+              #include <begin_vertex>
+
+              // Simple Organic Wave Interference
+              float wave = sin(position.x * 3.0 + uTime * uWaveSpeed) *
+                           sin(position.y * 3.0 + uTime * uWaveSpeed * 0.8) *
+                           cos(position.z * 3.0 + uTime * uWaveSpeed * 0.5);
+
+              // Displace along normal
+              transformed += normal * wave * uWaveHeight;
+            `,
+          );
+
+          shader.vertexShader = shader.vertexShader.replace(
+            "#include <worldpos_vertex>",
+            `
+              #include <worldpos_vertex>
+              vWorldPositionFog = worldPosition.xyz;
+            `,
+          );
+
+          // Fragment Logic: Apply Horizon Fog (Same as before)
+          shader.fragmentShader = shader.fragmentShader.replace(
+            "#include <common>",
+            `
+              #include <common>
+              varying vec3 vWorldPositionFog;
+              uniform vec3 uHorizonColor;
+              uniform float uHorizonStrength;
+              uniform float uHorizonPower;
+            `,
+          );
+          shader.fragmentShader = shader.fragmentShader.replace(
+            "#include <dithering_fragment>",
+            `
+              #include <dithering_fragment>
+              vec3 hNormal = normalize(vWorldPositionFog);
+              vec3 hView = normalize(cameraPosition - vWorldPositionFog);
+              float hDot = max(0.0, dot(hNormal, hView));
+              float hFactor = 1.0 - hDot;
+              hFactor = pow(hFactor, uHorizonPower);
+              float hIntensity = hFactor * uHorizonStrength;
+              gl_FragColor.rgb = mix(gl_FragColor.rgb, uHorizonColor, hIntensity);
+            `,
+          );
+        };
+      }
+
+      // --- EXISTING SHADERS ---
       const ATMO_VERTEX = `
             varying vec3 vNormal;
             varying vec3 vWorldPosition;
 
             void main() {
-                // Calculate normal in world space
                 vNormal = normalize(mat3(modelMatrix) * normal);
-
-                // Calculate world position
                 vec4 worldPos = modelMatrix * vec4(position, 1.0);
                 vWorldPosition = worldPos.xyz;
-
                 gl_Position = projectionMatrix * viewMatrix * worldPos;
             }
         `;
@@ -659,35 +859,25 @@
                 vec3 s = normalize(sunPosition);
                 vec3 v = normalize(cameraPosition - vWorldPosition);
 
-                // 1. Sun Angle
                 float sunAngle = dot(n, s);
-
-                // 2. Base Color: Day Color
                 vec3 finalColor = dayColor;
 
-                // 3. Sunset Band
                 float offsetAngle = sunAngle - uSunsetOffset;
                 float sunsetIntensity = 1.0 - smoothstep(0.0, uSunsetWidth, abs(offsetAngle));
                 finalColor = mix(finalColor, sunsetColor, sunsetIntensity);
 
-                // 4. Opacity / Alpha Logic
                 float dayAlpha = smoothstep(-0.2 + uSunsetOffset, 0.1 + uSunsetOffset, sunAngle);
 
-                // 5. Fresnel / Haze / Rim Effect
                 float viewDot = abs(dot(n, v));
                 float fresnel = 1.0 - viewDot;
                 fresnel = pow(fresnel, uHazeSpread);
 
-                // Haze Falloff Logic (View-Sun Alignment)
-                // dot(-v, s) is 1.0 when looking at sun, -1.0 when sun is behind camera
                 float sunViewDot = dot(-v, s);
-                float falloffFactor = (sunViewDot + 1.0) * 0.5; // Map to 0..1
+                float falloffFactor = (sunViewDot + 1.0) * 0.5;
                 falloffFactor = pow(falloffFactor, uHazeFalloff);
 
-                // Apply Intensity & Falloff
                 float hazeComponent = fresnel * uHazeIntensity * falloffFactor;
 
-                // 6. SUN HALO EFFECT
                 float sunHalo = smoothstep(0.85, 1.0, sunViewDot);
                 sunHalo = pow(sunHalo, 3.0);
 
@@ -698,11 +888,7 @@
 
                 finalColor = mix(finalColor, currentHaloColor, sunHalo * uHaloStrength);
 
-                // Combine Alpha (Additive Haze)
-                // Multiply by dayAlpha so it fades at night
                 float alpha = (uOpacity + hazeComponent) * dayAlpha;
-
-                // Add Halo Bloom Alpha
                 alpha += sunHalo * uHaloStrength * 0.6;
 
                 if (alpha < 0.01) discard;
@@ -873,6 +1059,11 @@
         cloudSize: 1.0,
         vegetationDensity: 50,
         starDensity: 4.5,
+        horizonStrength: 0.15,
+        horizonPower: 7.0,
+        // New Water Params
+        waveSpeed: 1.0,
+        waveHeight: 0.05,
       };
 
       const BIOMES = {
@@ -1356,6 +1547,11 @@
           roughness: 0.9,
         });
 
+        // --- INJECT HORIZON SHADER ---
+        setupHorizonShader(trunkMat);
+        setupHorizonShader(foliageMat);
+        setupHorizonShader(rockMat);
+
         const count = PARAMS.vegetationDensity * 4;
 
         const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
@@ -1490,6 +1686,11 @@
       }
 
       function generatePlanet() {
+        // Sync Horizon Color
+        HORIZON_UNIFORMS.uHorizonColor.value.setHex(
+          currentBiome.atmosphereColor,
+        );
+
         const prng = createPRNG(PARAMS.seed);
         const simplex = new SimplexNoise(prng);
         currentSimplex = simplex; // Expose for animation loop
@@ -1584,6 +1785,9 @@
           metalness: 0.1,
         });
 
+        // --- INJECT HORIZON SHADER ---
+        setupHorizonShader(material);
+
         planetMesh = new THREE.Mesh(nonIndexedGeo, material);
         planetMesh.castShadow = true;
         planetMesh.receiveShadow = true;
@@ -1606,11 +1810,12 @@
             roughness: 0.1,
             metalness: 0.5,
           });
+          // Use the new WATER shader (includes waves + horizon)
+          setupWaterShader(waterMat);
           waterMesh = new THREE.Mesh(waterGeo, waterMat);
           planetGroup.add(waterMesh);
         }
 
-        // --- REVERTED TO STEPPED ATMOSPHERE WITH IMPROVED SHADER ---
         if (atmoGroup) {
           atmoGroup.children.forEach((c) => {
             c.geometry.dispose();
@@ -1619,28 +1824,24 @@
           planetGroup.remove(atmoGroup);
           atmoGroup = null;
         }
-        atmoMaterials = []; // Clear tracker
+        atmoMaterials = [];
 
         if (PARAMS.atmosphereOpacity > 0) {
           atmoGroup = new THREE.Group();
           const steps = PARAMS.atmoCount;
 
-          // Sunset Color
           const sunsetColor = new THREE.Color(0xff6600);
-          // Current Atmosphere Color
           const dayColor = new THREE.Color(currentBiome.atmosphereColor);
 
           for (let i = 0; i < steps; i++) {
-            const s = PARAMS.atmoScale + i * 0.12; // Use new atmoScale param
-            // Detail 2 gives a smoother but still geometric halo
-            const geo = new THREE.IcosahedronGeometry(4.2, 2); // Base radius 4.2
+            const s = PARAMS.atmoScale + i * 0.12;
+            const geo = new THREE.IcosahedronGeometry(4.2, 2);
 
-            // Decrease opacity for outer shells
             const op = (PARAMS.atmosphereOpacity * 0.5) / (i + 1);
 
             const mat = new THREE.ShaderMaterial({
               uniforms: {
-                sunPosition: { value: new THREE.Vector3(1, 0, 0) }, // Will update in animate
+                sunPosition: { value: new THREE.Vector3(1, 0, 0) },
                 dayColor: { value: dayColor },
                 sunsetColor: { value: sunsetColor },
                 uOpacity: { value: op },
@@ -1652,11 +1853,11 @@
                 uHazeIntensity: {
                   value: PARAMS.hazeEnabled ? PARAMS.hazeIntensity : 0.0,
                 },
-                uHazeFalloff: { value: PARAMS.hazeFalloff }, // New Uniform
+                uHazeFalloff: { value: PARAMS.hazeFalloff },
               },
               vertexShader: ATMO_VERTEX,
               fragmentShader: ATMO_FRAGMENT,
-              side: THREE.BackSide, // BackSide for "glow" behind planet
+              side: THREE.BackSide,
               blending: THREE.AdditiveBlending,
               depthWrite: false,
               transparent: true,
@@ -1688,9 +1889,12 @@
           transparent: true,
         });
 
+        // --- INJECT HORIZON SHADER ---
+        setupHorizonShader(cloudMat);
+
         // RAIN GEOMETRY - Thinner, Longer streaks
         const rainGeo = new THREE.BoxGeometry(0.02, 0.6, 0.02);
-        rainGeo.rotateX(Math.PI / 2); // Align length to Z-axis (Vertical in cloud space)
+        rainGeo.rotateX(Math.PI / 2);
         const rainMat = new THREE.MeshBasicMaterial({
           color: 0xaaddff,
           transparent: true,
@@ -1742,7 +1946,6 @@
           const drops = 8;
           for (let r = 0; r < drops; r++) {
             const drop = new THREE.Mesh(rainGeo, rainMat);
-            // Correct spread logic: Spread in X/Y, Z is height
             drop.position.set(
               (Math.random() - 0.5) * spread * 1.5, // X
               (Math.random() - 0.5) * spread * 1.5, // Y
@@ -1752,7 +1955,6 @@
             rainGroup.add(drop);
           }
           rainGroup.visible = false;
-          // Removed the group rotation that caused misalignment
           cloud.add(rainGroup);
 
           cloud.userData = {
@@ -1788,20 +1990,20 @@
         water: document.getElementById("water"),
         veg: document.getElementById("veg"),
         atmo: document.getElementById("atmo"),
-        alayers: document.getElementById("alayers"), // New binding
+        alayers: document.getElementById("alayers"),
         speed: document.getElementById("speed"),
         cspeed: document.getElementById("cspeed"),
         sun: document.getElementById("sun"),
         dark: document.getElementById("dark"),
         halo: document.getElementById("halo"),
-        sred: document.getElementById("sred"), // New
-        sbright: document.getElementById("sbright"), // New
+        sred: document.getElementById("sred"),
+        sbright: document.getElementById("sbright"),
         soff: document.getElementById("soff"),
         swidth: document.getElementById("swidth"),
         ascale: document.getElementById("ascale"),
-        hspread: document.getElementById("hspread"), // New UI
-        hint: document.getElementById("hint"), // New UI
-        hfall: document.getElementById("hfall"), // New UI - FIX: Add this back to the object
+        hspread: document.getElementById("hspread"),
+        hint: document.getElementById("hint"),
+        hfall: document.getElementById("hfall"),
         stars: document.getElementById("stars"),
         cCov: document.getElementById("c-cov"),
         cAlt: document.getElementById("c-alt"),
@@ -1812,6 +2014,11 @@
         panel: document.getElementById("ui-panel"),
         pauseIndicator: document.getElementById("pause-indicator"),
         htoggle: document.getElementById("hazetoggle"),
+        // New UI
+        hStr: document.getElementById("h-str"),
+        hPow: document.getElementById("h-pow"),
+        wSpeed: document.getElementById("wspeed"),
+        wHeight: document.getElementById("wheight"),
       };
 
       const displays = {
@@ -1833,13 +2040,18 @@
         soff: document.getElementById("val-soff"),
         swidth: document.getElementById("val-swidth"),
         ascale: document.getElementById("val-ascale"),
-        hspread: document.getElementById("val-hspread"), // New Display
-        hint: document.getElementById("val-hint"), // New Display
-        hfall: document.getElementById("val-hfall"), // New Display - FIX: Add this back to the object
+        hspread: document.getElementById("val-hspread"),
+        hint: document.getElementById("val-hint"),
+        hfall: document.getElementById("val-hfall"),
         stars: document.getElementById("val-stars"),
         cCov: document.getElementById("val-c-cov"),
         cAlt: document.getElementById("val-c-alt"),
         cSize: document.getElementById("val-c-size"),
+        // New Display
+        hStr: document.getElementById("val-h-str"),
+        hPow: document.getElementById("val-h-pow"),
+        wSpeed: document.getElementById("val-wspeed"),
+        wHeight: document.getElementById("val-wheight"),
       };
 
       // Toggle Control Logic
@@ -1862,15 +2074,16 @@
       }
 
       function bindInput(key, element, display, isInt = false) {
-        // Handle Checkbox
+        if (!element) {
+          // Guard against missing elements
+          return;
+        }
+
         if (element.type === "checkbox") {
           element.addEventListener("change", (e) => {
             PARAMS[key] = e.target.checked;
-
-            // Trigger specific updates
             if (key === "hazeEnabled") {
               atmoMaterials.forEach((mat) => {
-                // If enabled, use intensity value. If disabled, use 0.0.
                 mat.uniforms.uHazeIntensity.value = PARAMS.hazeEnabled
                   ? PARAMS.hazeIntensity
                   : 0.0;
@@ -1880,15 +2093,21 @@
           return;
         }
 
-        // Handle Sliders/Inputs
         element.addEventListener("input", (e) => {
           let val = parseFloat(e.target.value);
           if (isInt) val = parseInt(val);
           PARAMS[key] = val;
 
-          // Special formatting for multipliers
           if (key === "starDensity") display.innerText = val.toFixed(1) + "x";
           else if (display) display.innerText = val;
+
+          // Horizon Controls
+          if (key === "horizonStrength")
+            HORIZON_UNIFORMS.uHorizonStrength.value = val;
+          if (key === "horizonPower")
+            HORIZON_UNIFORMS.uHorizonPower.value = val;
+          if (key === "waveSpeed") WATER_UNIFORMS.uWaveSpeed.value = val;
+          if (key === "waveHeight") WATER_UNIFORMS.uWaveHeight.value = val;
 
           if (key === "nightDarkness") {
             updateLighting();
@@ -1907,7 +2126,7 @@
                 mat.uniforms.uSunsetOffset.value = val;
               if (key === "sunsetWidth") mat.uniforms.uSunsetWidth.value = val;
               if (key === "hazeSpread") mat.uniforms.uHazeSpread.value = val;
-              if (key === "hazeFalloff") mat.uniforms.uHazeFalloff.value = val; // New
+              if (key === "hazeFalloff") mat.uniforms.uHazeFalloff.value = val;
               if (key === "hazeIntensity") {
                 mat.uniforms.uHazeIntensity.value = PARAMS.hazeEnabled
                   ? val
@@ -1923,7 +2142,11 @@
             key !== "cloudSpeed" &&
             key !== "sunSpeed" &&
             key !== "sunReddening" &&
-            key !== "sunBrightness"
+            key !== "sunBrightness" &&
+            key !== "horizonStrength" &&
+            key !== "horizonPower" &&
+            key !== "waveSpeed" &&
+            key !== "waveHeight"
           ) {
             updatePlanet();
           }
@@ -1950,11 +2173,18 @@
       bindInput("sunsetWidth", ui.swidth, displays.swidth);
       bindInput("atmoScale", ui.ascale, displays.ascale);
 
-      // Haze bindings
-      bindInput("hazeEnabled", ui.htoggle, null); // Checkbox has no value display
+      bindInput("hazeEnabled", ui.htoggle, null);
       bindInput("hazeSpread", ui.hspread, displays.hspread);
       bindInput("hazeIntensity", ui.hint, displays.hint);
-      bindInput("hazeFalloff", ui.hfall, displays.hfall); // Bind New
+      bindInput("hazeFalloff", ui.hfall, displays.hfall);
+
+      // Bind Horizon
+      bindInput("horizonStrength", ui.hStr, displays.hStr);
+      bindInput("horizonPower", ui.hPow, displays.hPow);
+
+      // Bind Water
+      bindInput("waveSpeed", ui.wSpeed, displays.wSpeed);
+      bindInput("waveHeight", ui.wHeight, displays.wHeight);
 
       bindInput("cloudCoverage", ui.cCov, displays.cCov, true);
       bindInput("cloudAltitude", ui.cAlt, displays.cAlt);
@@ -2004,38 +2234,35 @@
 
         const time = clock.getElapsedTime();
 
+        // UPDATE WATER TIME UNIFORM
+        WATER_UNIFORMS.uTime.value = time;
+
         if (!isPaused) {
           planetGroup.rotation.y += PARAMS.rotationSpeed * delta * 0.5;
 
-          // Animate Sun
           if (sunOrbit) {
             sunOrbit.rotation.y += PARAMS.sunSpeed * delta;
             sunMesh.rotation.z -= delta * 0.5;
             sunMesh.rotation.x -= delta * 0.2;
           }
 
-          // Animate Clouds
           if (cloudsMesh) {
             cloudsMesh.rotation.y += PARAMS.cloudSpeed * delta;
           }
         }
 
-        // Always update visual effects even when paused (for smooth feedback)
         if (sunOrbit) {
           sunMesh.getWorldPosition(sunWorldPos);
 
-          // --- DYNAMIC SUN & HALO LOGIC ---
           const camPos = camera.position;
           vecToSun.subVectors(sunWorldPos, camPos);
           vecToPlanet.subVectors(new THREE.Vector3(0, 0, 0), camPos);
 
-          // Calculate perpendicular distance from view center
           crossVec.crossVectors(vecToSun, vecToPlanet);
           const perpDist = crossVec.length() / vecToSun.length();
 
           const isBehind = vecToSun.lengthSq() > vecToPlanet.lengthSq();
 
-          // Calculate Sunset Factor (0.0 to 1.0)
           let sunsetFactor = 0.0;
 
           if (isBehind) {
@@ -2135,7 +2362,6 @@
           });
         }
 
-        // --- CHARACTER LOGIC ---
         if (sam && algen && planetMesh && !isPaused) {
           // 1. Update SAM
           if (samState.stuckTimer > 5.0) {
@@ -2284,7 +2510,6 @@
           snapCharacter(algen, algenState, samState.phi, samState.theta);
         }
 
-        // stars.rotation.y -= delta * 0.02; // Handled via group rotation now if needed, or keep static
         if (!isPaused) {
           starsGroup.rotation.y -= delta * 0.02;
         }
@@ -2293,7 +2518,7 @@
       }
 
       generatePlanet();
-      generateStars(); // Initialize stars
+      generateStars();
       updateLighting();
       animate();
     </script>
