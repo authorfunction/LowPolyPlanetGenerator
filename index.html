@@ -1750,6 +1750,11 @@
           flatShading: true,
         });
 
+        // Setup Horizon Shader for characters so they fade properly
+        setupHorizonShader(boatMat);
+        setupHorizonShader(ratMat);
+        setupHorizonShader(pinkMat);
+
         const samMesh = new THREE.Group();
         sam.add(samMesh);
 
@@ -1809,6 +1814,10 @@
           color: 0xdddddd,
           flatShading: true,
         });
+
+        // Setup Horizon Shader for elk
+        setupHorizonShader(elkMat);
+        setupHorizonShader(antlerMat);
 
         const eBody = new THREE.Mesh(
           new THREE.BoxGeometry(0.3, 0.35, 0.6),
@@ -1886,6 +1895,30 @@
 
         algenState.phi = spawn.phi + 0.05;
         algenState.theta = spawn.theta + 0.05;
+
+        // Initial positioning
+        // Force a snap so they are visible on first frame even if paused or raycast lags
+        // Use a simple dummy logic here, real snap happens in animate
+        // But we need to ensure they don't start at (0,0,0)
+        sam.position.setFromSphericalCoords(4, samState.phi, samState.theta);
+        algen.position.setFromSphericalCoords(
+          4,
+          algenState.phi,
+          algenState.theta,
+        );
+
+        // Initial Snap - Must happen AFTER planet is generated so we have something to raycast against
+        // But createCharacters is called inside generatePlanet AFTER planetMesh is made, so it's safe.
+        // We need the snapCharacter function available.
+        if (typeof snapCharacter === "function") {
+          snapCharacter(
+            sam,
+            samState,
+            samState.targetPhi,
+            samState.targetTheta,
+          );
+          snapCharacter(algen, algenState, samState.phi, samState.theta);
+        }
       }
 
       function createPRNG(seed) {
@@ -2426,8 +2459,8 @@
         halo: document.getElementById("halo"),
         sred: document.getElementById("sred"),
         sbright: document.getElementById("sbright"),
-        soff: document.getElementById("val-soff"),
-        swidth: document.getElementById("val-swidth"),
+        soff: document.getElementById("soff"),
+        swidth: document.getElementById("swidth"),
         ascale: document.getElementById("ascale"),
         hspread: document.getElementById("hspread"),
         hint: document.getElementById("hint"),
@@ -2454,9 +2487,9 @@
         solar: document.getElementById("solar-enabled"),
         sunrise: document.getElementById("sunrise-temp"),
         sunset: document.getElementById("sunset-temp"),
-        riseTint: document.getElementById("risetint"),
-        setTint: document.getElementById("settint"),
-        tintDim: document.getElementById("tint-dim"), // Added
+        riseTint: document.getElementById("risetint"), // Updated
+        setTint: document.getElementById("settint"), // Updated
+        tintDim: document.getElementById("tint-dim"),
       };
 
       const displays = {
@@ -2492,9 +2525,9 @@
         wHeight: document.getElementById("val-wheight"),
         hazeDist: document.getElementById("val-haze-dist"),
         vib: document.getElementById("val-vib"),
-        riseTint: document.getElementById("val-risetint"),
-        setTint: document.getElementById("val-settint"),
-        tintDim: document.getElementById("val-tint-dim"), // Added
+        riseTint: document.getElementById("val-risetint"), // Updated
+        setTint: document.getElementById("val-settint"), // Updated
+        tintDim: document.getElementById("val-tint-dim"),
       };
 
       // Toggle Control Logic
@@ -2670,7 +2703,7 @@
         setVal(ui.sunset, PARAMS.sunsetTemp, null);
         setVal(ui.riseTint, PARAMS.sunriseTintStrength, displays.riseTint);
         setVal(ui.setTint, PARAMS.sunsetTintStrength, displays.setTint);
-        setVal(ui.tintDim, PARAMS.tintBrightnessDrop, displays.tintDim); // Added
+        setVal(ui.tintDim, PARAMS.tintBrightnessDrop, displays.tintDim);
 
         setVal(ui.htoggle, PARAMS.hazeEnabled);
         setVal(ui.flip, PARAMS.cycleFlip);
@@ -2945,6 +2978,87 @@
       const cSetOrange = new THREE.Color(0xffaa00);
       const cSetRed = new THREE.Color(0xff0044);
 
+      // --- SNAP CHARACTER FUNCTION (MOVED TO MODULE SCOPE) ---
+      function snapCharacter(obj, state, lookTargetPhi, lookTargetTheta) {
+        if (!obj || !planetMesh || !planetGroup) return; // Safety check
+
+        // Calculate desired position in spherical coordinates relative to planet center
+        charPos.setFromSphericalCoords(6, state.phi, state.theta);
+
+        // Apply planet rotation to find world position if character is 'stuck' to surface
+        // charPos is in local planet space mostly, but let's be robust.
+        // Actually, the logic used previously assumed planetGroup rotation was handled via scene graph.
+        // Let's calculate the raycast origin in World Space.
+        // The planet rotates, so 'state.phi/theta' are relative to the planet's local coordinate system?
+        // No, in this setup the planet mesh rotates inside the group.
+        // Let's stick to the original working logic:
+        // charPos calculated from spherical coords is treated as a "orbiting camera" position
+        // We need to raycast towards the center (0,0,0).
+
+        // Since the planetGroup rotates, the surface moves beneath the characters.
+        // To keep characters "on" a specific geographic spot, we'd need to rotate them with the group.
+        // BUT, the current logic (state.phi, state.theta) updates independently in `animate`.
+        // This implies characters "walk" across the surface, or slide if the planet rotates under them.
+        // Let's just use the Raycaster to find the surface height at the current angular position.
+
+        const rayOrigin = charPos.clone().applyMatrix4(planetGroup.matrixWorld);
+        const direction = new THREE.Vector3(0, 0, 0).sub(rayOrigin).normalize();
+
+        raycaster.set(rayOrigin, direction);
+        const intersects = raycaster.intersectObject(planetMesh);
+
+        if (intersects.length > 0) {
+          const hit = intersects[0];
+          const waterRadius = 4 + PARAMS.waterLevel * PARAMS.height * 0.5;
+
+          // Convert hit point back to local space to check radius
+          const localHit = hit.point
+            .clone()
+            .applyMatrix4(planetGroup.matrixWorld.clone().invert());
+          const dist = localHit.length();
+
+          let finalPos = localHit;
+          let normal = hit.face.normal.clone().normalize();
+          let isWater = false;
+
+          // Simple water check
+          if (dist < waterRadius) {
+            isWater = true;
+            finalPos.setLength(waterRadius);
+            normal.copy(finalPos).normalize();
+          }
+
+          obj.position.copy(finalPos);
+          obj.visible = true;
+
+          // Boat/Height logic
+          if (obj.userData.boat) {
+            obj.userData.boat.visible = isWater;
+            obj.userData.mesh.position.y = isWater
+              ? obj.userData.yOffsetWater
+              : obj.userData.yOffsetLand;
+          }
+
+          // Orientation
+          targetPos.setFromSphericalCoords(4, lookTargetPhi, lookTargetTheta);
+          const forward = targetPos.sub(obj.position).normalize();
+          const dot = forward.dot(normal);
+          const projectedForward = forward
+            .sub(normal.clone().multiplyScalar(dot))
+            .normalize();
+
+          dummyObj.position.copy(obj.position);
+          dummyObj.up.copy(normal);
+          lookTarget.copy(obj.position).add(projectedForward);
+          dummyObj.lookAt(lookTarget);
+
+          obj.quaternion.slerp(dummyObj.quaternion, 0.1);
+        } else {
+          // If raycast fails (e.g. gap in geometry or weird angle), hide character momentarily
+          obj.visible = false;
+        }
+      }
+
       function animate() {
         requestAnimationFrame(animate);
 
@@ -3076,7 +3190,163 @@
           sunMat.uniforms.uSolarEnabled.value = PARAMS.solarEnabled ? 1.0 : 0.0;
         }
 
-        // ... rest of animate loop ...
+        if (cloudsMesh && !isPaused) {
+          const cloudsRotation = cloudsMesh.rotation.y;
+
+          cloudsMesh.children.forEach((cloud) => {
+            cloud.rotation.z += cloud.userData.rotSpeed * delta;
+            const bob =
+              Math.sin(
+                time * cloud.userData.bobSpeed + cloud.userData.bobOffset,
+              ) * 0.05;
+            const r = cloud.userData.baseRadius + bob;
+            cloud.position.setLength(r);
+
+            if (currentSimplex) {
+              tempVec.copy(cloud.position).normalize().multiplyScalar(4.0);
+              tempVec.applyAxisAngle(
+                new THREE.Vector3(0, 1, 0),
+                cloudsRotation,
+              );
+              const x = tempVec.x;
+              const y = tempVec.y;
+              const z = tempVec.z;
+              const n1 = currentSimplex.noise(
+                x * PARAMS.scale * 0.1,
+                y * PARAMS.scale * 0.1,
+                z * PARAMS.scale * 0.1,
+              );
+              const n2 =
+                currentSimplex.noise(
+                  x * PARAMS.scale * 0.3,
+                  y * PARAMS.scale * 0.3,
+                  z * PARAMS.scale * 0.3,
+                ) * 0.5;
+              const n3 =
+                currentSimplex.noise(
+                  x * PARAMS.scale * 1.0,
+                  y * PARAMS.scale * 1.0,
+                  z * PARAMS.scale * 1.0,
+                ) * 0.2;
+              let noiseVal = Math.max(-0.5, n1 + n2 + n3);
+              const displacement = 1 + noiseVal * PARAMS.height * 0.2;
+              const surfaceH = (displacement * 4 - 4.0) / (PARAMS.height * 0.8);
+
+              let targetScale = 1.0;
+              let raining = false;
+              if (surfaceH > 0.6) {
+                raining = true;
+                targetScale = 0.2;
+              }
+
+              cloud.userData.currentScale = THREE.MathUtils.lerp(
+                cloud.userData.currentScale,
+                targetScale,
+                delta * 0.5,
+              );
+              const s = cloud.userData.currentScale;
+              cloud.scale.set(s, s, s);
+
+              const rainGroup = cloud.userData.rainGroup;
+              if (rainGroup) {
+                if (raining && s > 0.2) {
+                  rainGroup.visible = true;
+                  rainGroup.children.forEach((drop) => {
+                    drop.position.z += drop.userData.speed * delta * 3.0;
+                    if (drop.position.z > 2.5)
+                      drop.position.z = -0.1 - Math.random() * 0.2;
+                  });
+                } else {
+                  rainGroup.visible = false;
+                }
+              }
+            }
+          });
+        }
+
+        // Update Characters
+        if (sam && algen && planetMesh) {
+          // Always run snapping logic to ensure characters stay on surface
+          // Only run movement logic if not paused
+          if (!isPaused) {
+            // 1. Update SAM Movement
+            if (samState.stuckTimer > 5.0) {
+              const d = sam.position.distanceTo(samState.lastPos);
+              if (d < 1.0) {
+                samState.idleTime = 0;
+                samState.wanderAngle += Math.PI;
+                samState.stuckTimer = 0;
+              } else {
+                samState.lastPos.copy(sam.position);
+                samState.stuckTimer = 0;
+              }
+            } else {
+              samState.stuckTimer += delta;
+            }
+
+            if (samState.idleTime > 0) {
+              samState.idleTime -= delta;
+            } else {
+              const dPhi = samState.targetPhi - samState.phi;
+              let dTheta = samState.targetTheta - samState.theta;
+
+              if (dTheta > Math.PI) dTheta -= Math.PI * 2;
+              if (dTheta < -Math.PI) dTheta += Math.PI * 2;
+
+              const dist = Math.sqrt(dPhi * dPhi + dTheta * dTheta);
+
+              if (dist < 0.05) {
+                samState.wanderAngle += (Math.random() - 0.5) * 1.5;
+                const stepDist = 2.5 + Math.random() * 1.5;
+                const tp =
+                  samState.phi + Math.cos(samState.wanderAngle) * stepDist;
+                const tt =
+                  samState.theta + Math.sin(samState.wanderAngle) * stepDist;
+                samState.targetPhi = Math.max(0.1, Math.min(Math.PI - 0.1, tp));
+                samState.targetTheta = tt;
+                samState.idleTime = 0.2 + Math.random() * 0.5;
+              } else {
+                const speed = samState.speed * delta;
+                samState.phi += (dPhi / dist) * speed;
+                samState.theta += (dTheta / dist) * speed;
+              }
+            }
+
+            // 2. Update ÄLGEN Movement
+            let dPhi = samState.phi - algenState.phi;
+            let dTheta = samState.theta - algenState.theta;
+            if (dTheta > Math.PI) dTheta -= Math.PI * 2;
+            if (dTheta < -Math.PI) dTheta += Math.PI * 2;
+
+            const distToSam = Math.sqrt(dPhi * dPhi + dTheta * dTheta) * 4;
+
+            if (algenState.hesitationTimer > 0) {
+              algenState.hesitationTimer -= delta;
+              algenState.moving = false;
+            } else {
+              if (distToSam > 2.0) algenState.moving = true;
+              else if (distToSam < 1.0) algenState.moving = false;
+
+              if (algenState.moving) {
+                if (Math.random() < 0.005)
+                  algenState.hesitationTimer = 1.0 + Math.random() * 1.5;
+                const speed = algenState.speed * delta;
+                algenState.phi += dPhi * speed * 1.5;
+                algenState.theta += dTheta * speed * 1.5;
+              }
+            }
+          }
+
+          // Run snapping logic every frame
+          snapCharacter(
+            sam,
+            samState,
+            samState.targetPhi,
+            samState.targetTheta,
+          );
+          snapCharacter(algen, algenState, samState.phi, samState.theta);
+        }
+
         if (!isPaused) {
           starsGroup.rotation.y -= delta * 0.02;
         }
