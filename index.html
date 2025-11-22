@@ -551,6 +551,21 @@
               id="settint"
             />
 
+            <!-- Dimming Control -->
+            <div class="flex justify-between mb-1 mt-2">
+              <label class="text-xs text-gray-300">Tint Dimming</label>
+              <span id="val-tint-dim" class="text-xs text-gray-500">0.5</span>
+            </div>
+            <input
+              type="range"
+              min="0.0"
+              max="1.0"
+              step="0.05"
+              value="0.5"
+              class="slider"
+              id="tint-dim"
+            />
+
             <!-- New Temp Controls -->
             <div class="flex justify-between mb-1 mt-2">
               <label class="text-xs text-blue-300">Sunrise Temp</label>
@@ -993,6 +1008,7 @@
         sunsetTemp: 0.55,
         sunriseTintStrength: 0.5, // New Param
         sunsetTintStrength: 0.8, // New Param
+        tintBrightnessDrop: 0.5, // New Param (0.0 - 1.0)
       };
 
       // Working parameters (initialized to default)
@@ -2410,8 +2426,8 @@
         halo: document.getElementById("halo"),
         sred: document.getElementById("sred"),
         sbright: document.getElementById("sbright"),
-        soff: document.getElementById("soff"),
-        swidth: document.getElementById("swidth"),
+        soff: document.getElementById("val-soff"),
+        swidth: document.getElementById("val-swidth"),
         ascale: document.getElementById("ascale"),
         hspread: document.getElementById("hspread"),
         hint: document.getElementById("hint"),
@@ -2438,9 +2454,9 @@
         solar: document.getElementById("solar-enabled"),
         sunrise: document.getElementById("sunrise-temp"),
         sunset: document.getElementById("sunset-temp"),
-        riseTint: document.getElementById("risetint"), // Updated
-        setTint: document.getElementById("settint"), // Updated
-        sunTint: document.getElementById("suntint"),
+        riseTint: document.getElementById("risetint"),
+        setTint: document.getElementById("settint"),
+        tintDim: document.getElementById("tint-dim"), // Added
       };
 
       const displays = {
@@ -2476,8 +2492,9 @@
         wHeight: document.getElementById("val-wheight"),
         hazeDist: document.getElementById("val-haze-dist"),
         vib: document.getElementById("val-vib"),
-        riseTint: document.getElementById("val-risetint"), // Updated
-        setTint: document.getElementById("val-settint"), // Updated
+        riseTint: document.getElementById("val-risetint"),
+        setTint: document.getElementById("val-settint"),
+        tintDim: document.getElementById("val-tint-dim"), // Added
       };
 
       // Toggle Control Logic
@@ -2542,7 +2559,8 @@
               key !== "sunriseTemp" &&
               key !== "sunsetTemp" &&
               key !== "sunriseTintStrength" &&
-              key !== "sunsetTintStrength")
+              key !== "sunsetTintStrength" &&
+              key !== "tintBrightnessDrop")
           ) {
             if (key === "starDensity") generateStars();
             else updatePlanet();
@@ -2652,6 +2670,7 @@
         setVal(ui.sunset, PARAMS.sunsetTemp, null);
         setVal(ui.riseTint, PARAMS.sunriseTintStrength, displays.riseTint);
         setVal(ui.setTint, PARAMS.sunsetTintStrength, displays.setTint);
+        setVal(ui.tintDim, PARAMS.tintBrightnessDrop, displays.tintDim); // Added
 
         setVal(ui.htoggle, PARAMS.hazeEnabled);
         setVal(ui.flip, PARAMS.cycleFlip);
@@ -2878,6 +2897,7 @@
       bindInput("sunsetTemp", ui.sunset, null);
       bindInput("sunriseTintStrength", ui.riseTint, displays.riseTint);
       bindInput("sunsetTintStrength", ui.setTint, displays.setTint);
+      bindInput("tintBrightnessDrop", ui.tintDim, displays.tintDim);
 
       bindInput("cloudCoverage", ui.cCov, displays.cCov, true);
       bindInput("cloudAltitude", ui.cAlt, displays.cAlt);
@@ -3037,8 +3057,12 @@
 
           // 5. Apply overall brightness. If heavily tinted, we might want less blinding white brightness
           //    so the color shows.
-          let brightness = PARAMS.sunBrightness;
-          if (mixAlpha > 0.5) brightness *= 0.8; // Dim slightly when tinted to show color
+          const dimFactor = THREE.MathUtils.lerp(
+            1.0,
+            1.0 - PARAMS.tintBrightnessDrop,
+            mixAlpha,
+          );
+          let brightness = PARAMS.sunBrightness * dimFactor;
 
           sunColor.multiplyScalar(brightness);
           sunMat.uniforms.uColor.value.copy(baseSunColor); // Reset base to yellow
