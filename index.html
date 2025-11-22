@@ -2440,6 +2440,7 @@
         sunset: document.getElementById("sunset-temp"),
         riseTint: document.getElementById("risetint"), // Updated
         setTint: document.getElementById("settint"), // Updated
+        sunTint: document.getElementById("suntint"),
       };
 
       const displays = {
@@ -3062,6 +3063,7 @@
       // Initialize
       loadPresetsFromStorage();
       populatePresetDropdown();
+      applyParamsToUI();
       generatePlanet();
       generateStars();
       updateLighting();
