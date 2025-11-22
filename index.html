@@ -859,6 +859,34 @@
           />
         </div>
 
+        <!-- CAMERA CONTROLS -->
+        <div class="border-t border-white/10 pt-4 space-y-2">
+          <label
+            class="text-xs uppercase tracking-wider text-gray-400 font-semibold block"
+            >Camera</label
+          >
+          <div class="flex gap-2">
+            <button
+              id="cam-reset"
+              class="flex-1 bg-white/5 hover:bg-white/10 text-[10px] py-2 rounded border border-white/10 transition text-gray-300 hover:text-white"
+            >
+              Reset View
+            </button>
+            <button
+              id="cam-front"
+              class="flex-1 bg-white/5 hover:bg-white/10 text-[10px] py-2 rounded border border-white/10 transition text-gray-300 hover:text-white"
+            >
+              Front (XY)
+            </button>
+            <button
+              id="cam-top"
+              class="flex-1 bg-white/5 hover:bg-white/10 text-[10px] py-2 rounded border border-white/10 transition text-gray-300 hover:text-white"
+            >
+              Top (XZ)
+            </button>
+          </div>
+        </div>
+
         <div class="mt-auto pt-6 text-[10px] text-gray-600 text-center">
           Generated using Three.js & Simplex Noise.<br />
           Left Click to Orbit • Scroll to Zoom • P to Pause
@@ -2263,6 +2291,10 @@
         modalInput: document.getElementById("modal-input"),
         modalConfirm: document.getElementById("modal-confirm"),
         modalCancel: document.getElementById("modal-cancel"),
+        // Camera Controls
+        camReset: document.getElementById("cam-reset"),
+        camFront: document.getElementById("cam-front"),
+        camTop: document.getElementById("cam-top"),
         // Inputs
         seed: document.getElementById("seed"),
         detail: document.getElementById("detail"),
@@ -2668,6 +2700,33 @@
         }
       });
 
+      // --- CAMERA CONTROLS ---
+      ui.camReset.addEventListener("click", () => {
+        // Reset to initial perspective
+        camera.position.set(0, 4, 16);
+        camera.up.set(0, 1, 0);
+        controls.target.set(0, 0, 0);
+        controls.update();
+      });
+
+      ui.camFront.addEventListener("click", () => {
+        // Align to Z axis (Front view)
+        camera.position.set(0, 0, 16);
+        camera.up.set(0, 1, 0);
+        controls.target.set(0, 0, 0);
+        controls.update();
+      });
+
+      ui.camTop.addEventListener("click", () => {
+        // Align to Y axis (Top view)
+        // Note: TrackballControls can be finicky with perfect vertical alignment
+        // We add a tiny offset to z to prevent singular behavior
+        camera.position.set(0, 16, 0.001);
+        camera.up.set(0, 0, -1); // Orient up to correspond to screen top
+        controls.target.set(0, 0, 0);
+        controls.update();
+      });
+
       // Bind all inputs
       bindInput("seed", ui.seed, displays.seed, true);
       bindInput("detail", ui.detail, displays.detail, true);
@@ -3068,6 +3127,7 @@
           snapCharacter(algen, algenState, samState.phi, samState.theta);
         }
 
+        // stars.rotation.y -= delta * 0.02; // Handled via group rotation now if needed, or keep static
         if (!isPaused) {
           starsGroup.rotation.y -= delta * 0.02;
         }
