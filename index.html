@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Low Poly Planet - Dynamic Water</title>
+    <title>Low Poly Planet - Preset System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       body {
@@ -101,11 +101,74 @@
       #pause-indicator.visible {
         opacity: 1;
       }
+
+      /* --- CUSTOM MODAL STYLES --- */
+      #modal-overlay {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+        z-index: 50;
+        justify-content: center;
+        align-items: center;
+      }
+      #modal-box {
+        background: rgba(20, 20, 25, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 20px;
+        width: 300px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        transform: scale(0.95);
+        transition: transform 0.2s;
+      }
+      #modal-overlay.active {
+        display: flex;
+      }
+      #modal-overlay.active #modal-box {
+        transform: scale(1);
+      }
     </style>
   </head>
   <body>
     <div id="canvas-container"></div>
     <div id="pause-indicator">PAUSED (Press P)</div>
+
+    <!-- CUSTOM MODAL SYSTEM -->
+    <div id="modal-overlay">
+      <div id="modal-box">
+        <h3
+          id="modal-title"
+          class="text-sm font-bold text-white uppercase tracking-wider mb-2"
+        >
+          Message
+        </h3>
+        <p id="modal-text" class="text-xs text-gray-300 mb-4">Content</p>
+        <input
+          type="text"
+          id="modal-input"
+          class="w-full bg-black/50 border border-gray-600 rounded px-2 py-1 text-xs text-white mb-4 outline-none focus:border-blue-500 hidden"
+        />
+        <div class="flex justify-end gap-2">
+          <button
+            id="modal-cancel"
+            class="px-3 py-1 rounded text-xs text-gray-400 hover:bg-white/10 transition"
+          >
+            Cancel
+          </button>
+          <button
+            id="modal-confirm"
+            class="px-3 py-1 rounded text-xs bg-blue-600 text-white hover:bg-blue-500 transition"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Toggle UI Button -->
     <button id="ui-toggle" title="Toggle Controls">
@@ -129,7 +192,7 @@
       class="absolute top-0 right-0 h-full w-80 glass-panel z-10 p-6 flex flex-col overflow-y-auto transition-transform duration-300 transform translate-x-0"
       id="ui-panel"
     >
-      <div class="flex justify-between items-center mb-6">
+      <div class="flex justify-between items-center mb-4">
         <h1
           class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-blue-500"
         >
@@ -141,6 +204,44 @@
         >
           Randomize
         </button>
+      </div>
+
+      <!-- PRESET MANAGER -->
+      <div class="bg-gray-800/50 p-3 rounded-lg mb-4 border border-gray-700">
+        <div class="flex justify-between items-center mb-2">
+          <label
+            class="text-xs text-gray-400 font-bold uppercase tracking-wider"
+            >Presets</label
+          >
+        </div>
+        <div class="flex gap-2 mb-2">
+          <select
+            id="preset-select"
+            class="w-full bg-black/40 text-xs text-white border border-gray-600 rounded px-2 py-1 outline-none focus:border-blue-500"
+          >
+            <!-- Options populated via JS -->
+          </select>
+        </div>
+        <div class="flex gap-1">
+          <button
+            id="btn-save"
+            class="flex-1 bg-blue-600/40 hover:bg-blue-600/60 text-[10px] py-1 rounded border border-blue-500/30 transition"
+          >
+            Save
+          </button>
+          <button
+            id="btn-save-as"
+            class="flex-1 bg-blue-600/40 hover:bg-blue-600/60 text-[10px] py-1 rounded border border-blue-500/30 transition"
+          >
+            Save As
+          </button>
+          <button
+            id="btn-delete"
+            class="flex-1 bg-red-600/40 hover:bg-red-600/60 text-[10px] py-1 rounded border border-red-500/30 transition"
+          >
+            Delete
+          </button>
+        </div>
       </div>
 
       <div class="space-y-6">
@@ -359,6 +460,95 @@
               value="7.0"
               class="slider"
               id="h-pow"
+            />
+          </div>
+
+          <!-- SOLAR EFFECTS CONTROLS -->
+          <div class="bg-orange-900/20 p-3 rounded-lg">
+            <div class="flex justify-between items-center mb-2">
+              <label
+                class="text-xs text-orange-300 font-bold uppercase tracking-wider"
+                >Solar Effects</label
+              >
+              <div class="flex items-center space-x-3">
+                <div class="flex items-center space-x-1">
+                  <label class="text-[10px] text-orange-400">Flip</label>
+                  <input
+                    type="checkbox"
+                    id="flip-cycle"
+                    checked
+                    class="accent-orange-500 h-3 w-3 cursor-pointer"
+                  />
+                </div>
+                <div class="flex items-center space-x-1">
+                  <label class="text-[10px] text-green-400">On</label>
+                  <input
+                    type="checkbox"
+                    id="solar-enabled"
+                    checked
+                    class="accent-green-500 h-3 w-3 cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="flex justify-between mb-1">
+              <label class="text-xs text-orange-200">Heat Haze</label>
+              <span id="val-haze-dist" class="text-xs text-gray-500"
+                >0.005</span
+              >
+            </div>
+            <input
+              type="range"
+              min="0.0"
+              max="0.02"
+              step="0.001"
+              value="0.005"
+              class="slider"
+              id="haze-dist"
+            />
+
+            <div class="flex justify-between mb-1 mt-2">
+              <label class="text-xs text-orange-200">Color Vibrance</label>
+              <span id="val-vib" class="text-xs text-gray-500">1.2</span>
+            </div>
+            <input
+              type="range"
+              min="0.5"
+              max="2.0"
+              step="0.1"
+              value="1.2"
+              class="slider"
+              id="vib"
+            />
+
+            <!-- New Temp Controls -->
+            <div class="flex justify-between mb-1 mt-2">
+              <label class="text-xs text-blue-300">Sunrise Temp</label>
+              <span class="text-xs text-gray-500">Cold &rarr; Warm</span>
+            </div>
+            <input
+              type="range"
+              min="0.0"
+              max="1.0"
+              step="0.05"
+              value="0.0"
+              class="slider"
+              id="sunrise-temp"
+            />
+
+            <div class="flex justify-between mb-1 mt-2">
+              <label class="text-xs text-red-300">Sunset Temp</label>
+              <span class="text-xs text-gray-500">Orange &rarr; Red</span>
+            </div>
+            <input
+              type="range"
+              min="0.0"
+              max="1.0"
+              step="0.05"
+              value="0.5"
+              class="slider"
+              id="sunset-temp"
             />
           </div>
 
@@ -702,6 +892,74 @@
         uWaveHeight: { value: 0.05 },
       };
 
+      // --- PRESET MANAGEMENT ---
+      const PRESET_KEY = "planet_forge_presets";
+
+      // The immutable default configuration
+      // Profile Saved As [New Default]: {"biome":"terra","seed":0,"detail":30,"scale":1.5,"height":1.2,"waterLevel":0.2,"rotationSpeed":0,"cloudSpeed":0.1,"sunSpeed":0.1,"nightDarkness":0.8,"haloStrength":0.6,"sunReddening":1.8,"sunBrightness":5.5,"atmosphereOpacity":0.05,"atmoScale":1.75,"atmoCount":5,"sunsetOffset":0.45,"sunsetWidth":0.31,"hazeEnabled":true,"hazeSpread":1,"hazeIntensity":0.7,"hazeFalloff":30,"cloudCoverage":20,"cloudAltitude":0.4,"cloudSize":1,"vegetationDensity":50,"starDensity":5,"horizonStrength":0.15,"horizonPower":7,"waveSpeed":1,"waveHeight":0.05,"cycleFlip":true,"solarEnabled":true,"hazeDistortion":0.006,"colorVibrance":2,"sunriseTemp":0.8,"sunsetTemp":0.55}
+      const DEFAULT_PARAMS = {
+        biome: "terra",
+        seed: 123,
+        detail: 30,
+        scale: 1.5,
+        height: 1.2,
+        waterLevel: 0.2,
+        rotationSpeed: 0.0,
+        cloudSpeed: 0.1,
+        sunSpeed: 0.1,
+        nightDarkness: 0.9,
+        haloStrength: 1.4,
+        sunReddening: 0.9,
+        sunBrightness: 3.0,
+        atmosphereOpacity: 0.05,
+        atmoScale: 1.9,
+        atmoCount: 5,
+        sunsetOffset: 0.4,
+        sunsetWidth: 0.41,
+        hazeEnabled: true,
+        hazeSpread: 1.0,
+        hazeIntensity: 1.0,
+        hazeFalloff: 30.0,
+        cloudCoverage: 20,
+        cloudAltitude: 0.4,
+        cloudSize: 1.0,
+        vegetationDensity: 50,
+        starDensity: 4.5,
+        horizonStrength: 0.15,
+        horizonPower: 7.0,
+        waveSpeed: 1.0,
+        waveHeight: 0.05,
+        cycleFlip: true,
+        solarEnabled: true,
+        hazeDistortion: 0.005,
+        colorVibrance: 1.2,
+        sunriseTemp: 0.0,
+        sunsetTemp: 0.5,
+      };
+
+      // Working parameters (initialized to default)
+      const PARAMS = { ...DEFAULT_PARAMS };
+
+      let savedPresets = {};
+
+      function loadPresetsFromStorage() {
+        try {
+          const stored = localStorage.getItem(PRESET_KEY);
+          if (stored) {
+            savedPresets = JSON.parse(stored);
+          } else {
+            savedPresets = {};
+          }
+        } catch (e) {
+          console.error("Failed to load presets", e);
+          savedPresets = {};
+        }
+      }
+
+      function savePresetsToStorage() {
+        localStorage.setItem(PRESET_KEY, JSON.stringify(savedPresets));
+      }
+
       // --- SHADER INJECTION FUNCTIONS ---
 
       // 1. Standard Horizon Fog (For Land, Trees, Clouds)
@@ -838,10 +1096,12 @@
             }
         `;
 
+      // UPDATED FRAGMENT SHADER: Supports Sunrise/Sunset differentiation & Heat Haze & Bypass
       const ATMO_FRAGMENT = `
             uniform vec3 sunPosition;
             uniform vec3 dayColor;
             uniform vec3 sunsetColor;
+            uniform vec3 sunriseColor;
             uniform float uOpacity;
             uniform float uHaloStrength;
             uniform float uSunsetOffset;
@@ -850,6 +1110,11 @@
             uniform float uHazeSpread;
             uniform float uHazeIntensity;
             uniform float uHazeFalloff;
+            uniform float uSunSide;
+            uniform float uTime;
+            uniform float uDistortion;
+            uniform float uVibrance;
+            uniform float uSolarEnabled; // New Toggle
 
             varying vec3 vNormal;
             varying vec3 vWorldPosition;
@@ -862,28 +1127,59 @@
                 float sunAngle = dot(n, s);
                 vec3 finalColor = dayColor;
 
+                // --- MODE SELECTION ---
+                vec3 targetHorizonColor = sunsetColor;
+                float heatWave = 0.0;
+                float sharpness = 1.0;
+                float vibrance = 1.0;
+
+                if (uSolarEnabled > 0.5) {
+                    // Solar Effects ON
+                    float sideMix = smoothstep(-0.5, 0.5, uSunSide);
+                    targetHorizonColor = mix(sunriseColor, sunsetColor, sideMix);
+                    vibrance = uVibrance;
+
+                    if (uSunSide > 0.2) {
+                        heatWave = sin(vWorldPosition.y * 15.0 + uTime * 3.0) * uDistortion * uSunSide;
+                    }
+                    sharpness = mix(1.5, 0.8, sideMix);
+                } else {
+                    // Solar Effects OFF (Classic Mode)
+                    // Horizon color is uniform sunset color
+                    targetHorizonColor = sunsetColor;
+                    heatWave = 0.0;
+                    sharpness = 1.0;
+                    vibrance = 1.0;
+                }
+
+                // Apply Vibrance
+                targetHorizonColor *= vibrance;
+
+                // Sunset Band Logic
                 float offsetAngle = sunAngle - uSunsetOffset;
                 float sunsetIntensity = 1.0 - smoothstep(0.0, uSunsetWidth, abs(offsetAngle));
-                finalColor = mix(finalColor, sunsetColor, sunsetIntensity);
+                finalColor = mix(finalColor, targetHorizonColor, sunsetIntensity);
 
                 float dayAlpha = smoothstep(-0.2 + uSunsetOffset, 0.1 + uSunsetOffset, sunAngle);
 
+                // View/Fresnel Logic
                 float viewDot = abs(dot(n, v));
                 float fresnel = 1.0 - viewDot;
-                fresnel = pow(fresnel, uHazeSpread);
+                fresnel = pow(fresnel, uHazeSpread * sharpness);
 
                 float sunViewDot = dot(-v, s);
-                float falloffFactor = (sunViewDot + 1.0) * 0.5;
+                float sunCheck = sunViewDot + heatWave;
+
+                float falloffFactor = (sunCheck + 1.0) * 0.5;
                 falloffFactor = pow(falloffFactor, uHazeFalloff);
 
                 float hazeComponent = fresnel * uHazeIntensity * falloffFactor;
 
-                float sunHalo = smoothstep(0.85, 1.0, sunViewDot);
+                float sunHalo = smoothstep(0.85, 1.0, sunCheck);
                 sunHalo = pow(sunHalo, 3.0);
 
-                vec3 haloColor = mix(sunsetColor, vec3(1.0, 0.9, 0.7), 0.3);
                 vec3 dayHalo = vec3(1.0, 1.0, 0.9);
-                vec3 setHalo = sunsetColor * 1.2;
+                vec3 setHalo = targetHorizonColor * 1.2;
                 vec3 currentHaloColor = mix(dayHalo, setHalo, uSunsetFactor);
 
                 finalColor = mix(finalColor, currentHaloColor, sunHalo * uHaloStrength);
@@ -1031,40 +1327,6 @@
           return 32.0 * (n0 + n1 + n2 + n3);
         }
       }
-
-      const PARAMS = {
-        seed: 123,
-        detail: 30,
-        scale: 1.5,
-        height: 1.2,
-        waterLevel: 0.2,
-        rotationSpeed: 0.0,
-        cloudSpeed: 0.1,
-        sunSpeed: 0.1,
-        nightDarkness: 0.9,
-        haloStrength: 1.4,
-        sunReddening: 0.9,
-        sunBrightness: 3.0,
-        atmosphereOpacity: 0.05,
-        atmoScale: 1.9,
-        atmoCount: 5,
-        sunsetOffset: 0.4,
-        sunsetWidth: 0.41,
-        hazeEnabled: true,
-        hazeSpread: 1.0,
-        hazeIntensity: 1.0,
-        hazeFalloff: 30.0,
-        cloudCoverage: 20,
-        cloudAltitude: 0.4,
-        cloudSize: 1.0,
-        vegetationDensity: 50,
-        starDensity: 4.5,
-        horizonStrength: 0.15,
-        horizonPower: 7.0,
-        // New Water Params
-        waveSpeed: 1.0,
-        waveHeight: 0.05,
-      };
 
       const BIOMES = {
         terra: {
@@ -1831,6 +2093,8 @@
           const steps = PARAMS.atmoCount;
 
           const sunsetColor = new THREE.Color(0xff6600);
+          // New Sunrise Color (Blue-ish Pink)
+          const sunriseColor = new THREE.Color(0x88aaff); // Cool Blue/Violet
           const dayColor = new THREE.Color(currentBiome.atmosphereColor);
 
           for (let i = 0; i < steps; i++) {
@@ -1844,6 +2108,7 @@
                 sunPosition: { value: new THREE.Vector3(1, 0, 0) },
                 dayColor: { value: dayColor },
                 sunsetColor: { value: sunsetColor },
+                sunriseColor: { value: sunriseColor }, // New Uniform
                 uOpacity: { value: op },
                 uHaloStrength: { value: PARAMS.haloStrength },
                 uSunsetOffset: { value: PARAMS.sunsetOffset },
@@ -1854,6 +2119,11 @@
                   value: PARAMS.hazeEnabled ? PARAMS.hazeIntensity : 0.0,
                 },
                 uHazeFalloff: { value: PARAMS.hazeFalloff },
+                uSunSide: { value: 0.0 }, // New Uniform
+                uTime: { value: 0.0 }, // New Uniform
+                uDistortion: { value: PARAMS.hazeDistortion }, // New Uniform
+                uVibrance: { value: PARAMS.colorVibrance }, // New Uniform
+                uSolarEnabled: { value: PARAMS.solarEnabled ? 1.0 : 0.0 }, // Toggle
               },
               vertexShader: ATMO_VERTEX,
               fragmentShader: ATMO_FRAGMENT,
@@ -1983,6 +2253,18 @@
       }
 
       const ui = {
+        presetSelect: document.getElementById("preset-select"),
+        btnSave: document.getElementById("btn-save"),
+        btnSaveAs: document.getElementById("btn-save-as"),
+        btnDelete: document.getElementById("btn-delete"),
+        // Modal Elements
+        modalOverlay: document.getElementById("modal-overlay"),
+        modalTitle: document.getElementById("modal-title"),
+        modalText: document.getElementById("modal-text"),
+        modalInput: document.getElementById("modal-input"),
+        modalConfirm: document.getElementById("modal-confirm"),
+        modalCancel: document.getElementById("modal-cancel"),
+        // Inputs
         seed: document.getElementById("seed"),
         detail: document.getElementById("detail"),
         scale: document.getElementById("scale"),
@@ -2019,6 +2301,13 @@
         hPow: document.getElementById("h-pow"),
         wSpeed: document.getElementById("wspeed"),
         wHeight: document.getElementById("wheight"),
+        // Solar Effects
+        hazeDist: document.getElementById("haze-dist"),
+        vib: document.getElementById("vib"),
+        flip: document.getElementById("flip-cycle"),
+        solar: document.getElementById("solar-enabled"),
+        sunrise: document.getElementById("sunrise-temp"),
+        sunset: document.getElementById("sunset-temp"),
       };
 
       const displays = {
@@ -2052,6 +2341,8 @@
         hPow: document.getElementById("val-h-pow"),
         wSpeed: document.getElementById("val-wspeed"),
         wHeight: document.getElementById("val-wheight"),
+        hazeDist: document.getElementById("val-haze-dist"),
+        vib: document.getElementById("val-vib"),
       };
 
       // Toggle Control Logic
@@ -2082,13 +2373,7 @@
         if (element.type === "checkbox") {
           element.addEventListener("change", (e) => {
             PARAMS[key] = e.target.checked;
-            if (key === "hazeEnabled") {
-              atmoMaterials.forEach((mat) => {
-                mat.uniforms.uHazeIntensity.value = PARAMS.hazeEnabled
-                  ? PARAMS.hazeIntensity
-                  : 0.0;
-              });
-            }
+            updateDependentShaders(key, e.target.checked);
           });
           return;
         }
@@ -2101,58 +2386,290 @@
           if (key === "starDensity") display.innerText = val.toFixed(1) + "x";
           else if (display) display.innerText = val;
 
-          // Horizon Controls
-          if (key === "horizonStrength")
-            HORIZON_UNIFORMS.uHorizonStrength.value = val;
-          if (key === "horizonPower")
-            HORIZON_UNIFORMS.uHorizonPower.value = val;
-          if (key === "waveSpeed") WATER_UNIFORMS.uWaveSpeed.value = val;
-          if (key === "waveHeight") WATER_UNIFORMS.uWaveHeight.value = val;
+          // Update uniforms immediately
+          updateDependentShaders(key, val);
 
-          if (key === "nightDarkness") {
-            updateLighting();
-          } else if (
-            key === "haloStrength" ||
-            key === "sunsetOffset" ||
-            key === "sunsetWidth" ||
-            key === "hazeSpread" ||
-            key === "hazeIntensity" ||
-            key === "hazeFalloff"
+          // Triggers re-generation if needed
+          if (
+            key === "starDensity" ||
+            key === "atmoScale" ||
+            key === "atmoCount" ||
+            (key !== "rotationSpeed" &&
+              key !== "cloudSpeed" &&
+              key !== "sunSpeed" &&
+              key !== "sunReddening" &&
+              key !== "sunBrightness" &&
+              key !== "horizonStrength" &&
+              key !== "horizonPower" &&
+              key !== "waveSpeed" &&
+              key !== "waveHeight" &&
+              key !== "cycleFlip" &&
+              key !== "sunriseTemp" &&
+              key !== "sunsetTemp")
           ) {
-            atmoMaterials.forEach((mat) => {
-              if (key === "haloStrength")
-                mat.uniforms.uHaloStrength.value = val;
-              if (key === "sunsetOffset")
-                mat.uniforms.uSunsetOffset.value = val;
-              if (key === "sunsetWidth") mat.uniforms.uSunsetWidth.value = val;
-              if (key === "hazeSpread") mat.uniforms.uHazeSpread.value = val;
-              if (key === "hazeFalloff") mat.uniforms.uHazeFalloff.value = val;
-              if (key === "hazeIntensity") {
-                mat.uniforms.uHazeIntensity.value = PARAMS.hazeEnabled
-                  ? val
-                  : 0.0;
-              }
-            });
-          } else if (key === "starDensity") {
-            generateStars();
-          } else if (key === "atmoScale" || key === "atmoCount") {
-            updatePlanet();
-          } else if (
-            key !== "rotationSpeed" &&
-            key !== "cloudSpeed" &&
-            key !== "sunSpeed" &&
-            key !== "sunReddening" &&
-            key !== "sunBrightness" &&
-            key !== "horizonStrength" &&
-            key !== "horizonPower" &&
-            key !== "waveSpeed" &&
-            key !== "waveHeight"
-          ) {
-            updatePlanet();
+            if (key === "starDensity") generateStars();
+            else updatePlanet();
+          }
+
+          if (key === "nightDarkness") updateLighting();
+        });
+      }
+
+      function updateDependentShaders(key, val) {
+        // Horizon Controls
+        if (key === "horizonStrength")
+          HORIZON_UNIFORMS.uHorizonStrength.value = val;
+        if (key === "horizonPower") HORIZON_UNIFORMS.uHorizonPower.value = val;
+        if (key === "waveSpeed") WATER_UNIFORMS.uWaveSpeed.value = val;
+        if (key === "waveHeight") WATER_UNIFORMS.uWaveHeight.value = val;
+
+        atmoMaterials.forEach((mat) => {
+          if (key === "haloStrength") mat.uniforms.uHaloStrength.value = val;
+          if (key === "sunsetOffset") mat.uniforms.uSunsetOffset.value = val;
+          if (key === "sunsetWidth") mat.uniforms.uSunsetWidth.value = val;
+          if (key === "hazeSpread") mat.uniforms.uHazeSpread.value = val;
+          if (key === "hazeFalloff") mat.uniforms.uHazeFalloff.value = val;
+          if (key === "hazeDistortion") mat.uniforms.uDistortion.value = val;
+          if (key === "colorVibrance") mat.uniforms.uVibrance.value = val;
+          if (key === "solarEnabled")
+            mat.uniforms.uSolarEnabled.value = val ? 1.0 : 0.0;
+          if (key === "hazeIntensity") {
+            mat.uniforms.uHazeIntensity.value = PARAMS.hazeEnabled ? val : 0.0;
+          }
+          if (key === "hazeEnabled") {
+            mat.uniforms.uHazeIntensity.value = val
+              ? PARAMS.hazeIntensity
+              : 0.0;
           }
         });
       }
 
+      // --- PRESET UI LOGIC ---
+
+      function populatePresetDropdown() {
+        ui.presetSelect.innerHTML = "";
+
+        // Add Default
+        const defaultOpt = document.createElement("option");
+        defaultOpt.value = "Default";
+        defaultOpt.innerText = "Default";
+        ui.presetSelect.appendChild(defaultOpt);
+
+        // Add Saved
+        Object.keys(savedPresets).forEach((name) => {
+          const opt = document.createElement("option");
+          opt.value = name;
+          opt.innerText = name;
+          ui.presetSelect.appendChild(opt);
+        });
+      }
+
+      function applyParamsToUI() {
+        // Iterate over PARAMS keys and update corresponding UI elements
+        // Helper to set value and trigger event
+        const setVal = (el, val, display) => {
+          if (!el) return;
+          if (el.type === "checkbox") {
+            el.checked = val;
+          } else {
+            el.value = val;
+            if (display) {
+              if (el.id === "stars") display.innerText = val.toFixed(1) + "x";
+              else display.innerText = val;
+            }
+          }
+        };
+
+        setVal(ui.seed, PARAMS.seed, displays.seed);
+        setVal(ui.detail, PARAMS.detail, displays.detail);
+        setVal(ui.scale, PARAMS.scale, displays.scale);
+        setVal(ui.height, PARAMS.height, displays.height);
+        setVal(ui.water, PARAMS.waterLevel, displays.water);
+        setVal(ui.veg, PARAMS.vegetationDensity, displays.veg);
+        setVal(ui.atmo, PARAMS.atmosphereOpacity, displays.atmo);
+        setVal(ui.alayers, PARAMS.atmoCount, displays.alayers);
+        setVal(ui.speed, PARAMS.rotationSpeed, displays.speed);
+        setVal(ui.cspeed, PARAMS.cloudSpeed, displays.cspeed);
+        setVal(ui.sun, PARAMS.sunSpeed, displays.sun);
+        setVal(ui.dark, PARAMS.nightDarkness, displays.dark);
+        setVal(ui.halo, PARAMS.haloStrength, displays.halo);
+        setVal(ui.sred, PARAMS.sunReddening, displays.sred);
+        setVal(ui.sbright, PARAMS.sunBrightness, displays.sbright);
+        setVal(ui.soff, PARAMS.sunsetOffset, displays.soff);
+        setVal(ui.swidth, PARAMS.sunsetWidth, displays.swidth);
+        setVal(ui.ascale, PARAMS.atmoScale, displays.ascale);
+        setVal(ui.hspread, PARAMS.hazeSpread, displays.hspread);
+        setVal(ui.hint, PARAMS.hazeIntensity, displays.hint);
+        setVal(ui.hfall, PARAMS.hazeFalloff, displays.hfall);
+        setVal(ui.stars, PARAMS.starDensity, displays.stars);
+        setVal(ui.cCov, PARAMS.cloudCoverage, displays.cCov);
+        setVal(ui.cAlt, PARAMS.cloudAltitude, displays.cAlt);
+        setVal(ui.cSize, PARAMS.cloudSize, displays.cSize);
+        setVal(ui.hStr, PARAMS.horizonStrength, displays.hStr);
+        setVal(ui.hPow, PARAMS.horizonPower, displays.hPow);
+        setVal(ui.wSpeed, PARAMS.waveSpeed, displays.wSpeed);
+        setVal(ui.wHeight, PARAMS.waveHeight, displays.wHeight);
+        setVal(ui.hazeDist, PARAMS.hazeDistortion, displays.hazeDist);
+        setVal(ui.vib, PARAMS.colorVibrance, displays.vib);
+        setVal(ui.sunrise, PARAMS.sunriseTemp, null);
+        setVal(ui.sunset, PARAMS.sunsetTemp, null);
+
+        setVal(ui.htoggle, PARAMS.hazeEnabled);
+        setVal(ui.flip, PARAMS.cycleFlip);
+        setVal(ui.solar, PARAMS.solarEnabled);
+
+        // Handle Biome Button Highlight
+        ui.presets.forEach((b) => b.classList.remove("ring-2", "ring-white"));
+        const activeBtn = document.querySelector(
+          `.preset-btn[data-preset="${PARAMS.biome}"]`,
+        );
+        if (activeBtn) activeBtn.classList.add("ring-2", "ring-white");
+
+        // Trigger visual updates
+        currentBiome = BIOMES[PARAMS.biome];
+        rimLight.color.setHex(currentBiome.atmosphereColor);
+        updateLighting();
+        generateStars();
+        updatePlanet();
+
+        // Update all uniforms
+        Object.keys(PARAMS).forEach((key) => {
+          updateDependentShaders(key, PARAMS[key]);
+        });
+      }
+
+      function loadSelectedPreset() {
+        const name = ui.presetSelect.value;
+        let data;
+
+        if (name === "Default") {
+          data = { ...DEFAULT_PARAMS };
+        } else if (savedPresets[name]) {
+          data = { ...savedPresets[name] };
+        } else {
+          return;
+        }
+
+        // Apply data to PARAMS
+        Object.assign(PARAMS, data);
+        console.log(`Profile Loaded [${name}]:`, PARAMS);
+
+        applyParamsToUI();
+      }
+
+      ui.presetSelect.addEventListener("change", loadSelectedPreset);
+
+      // --- MODAL SYSTEM LOGIC ---
+      function showModal(title, text, isPrompt = false, isConfirm = false) {
+        return new Promise((resolve) => {
+          ui.modalTitle.innerText = title;
+          ui.modalText.innerText = text;
+          ui.modalOverlay.classList.add("active");
+
+          // Setup Input
+          if (isPrompt) {
+            ui.modalInput.classList.remove("hidden");
+            ui.modalInput.value = "";
+            ui.modalInput.focus();
+          } else {
+            ui.modalInput.classList.add("hidden");
+          }
+
+          // Setup Buttons
+          if (isConfirm || isPrompt) {
+            ui.modalCancel.classList.remove("hidden");
+          } else {
+            ui.modalCancel.classList.add("hidden");
+          }
+
+          // Handlers
+          const close = () => {
+            ui.modalOverlay.classList.remove("active");
+            cleanup();
+          };
+
+          const onConfirm = () => {
+            const val = isPrompt ? ui.modalInput.value : true;
+            close();
+            resolve(val);
+          };
+
+          const onCancel = () => {
+            close();
+            resolve(false);
+          };
+
+          const onKey = (e) => {
+            if (e.key === "Enter") onConfirm();
+            if (e.key === "Escape") onCancel();
+          };
+
+          ui.modalConfirm.onclick = onConfirm;
+          ui.modalCancel.onclick = onCancel;
+          ui.modalInput.onkeydown = onKey;
+
+          function cleanup() {
+            ui.modalConfirm.onclick = null;
+            ui.modalCancel.onclick = null;
+            ui.modalInput.onkeydown = null;
+          }
+        });
+      }
+
+      ui.btnSave.addEventListener("click", async () => {
+        const name = ui.presetSelect.value;
+        if (name === "Default") {
+          await showModal(
+            "Error",
+            "Cannot overwrite Default preset. Use 'Save As'.",
+          );
+          return;
+        }
+        // Confirm overwrite if it exists (implicit in this flow, but good practice)
+        savedPresets[name] = { ...PARAMS };
+        savePresetsToStorage();
+        console.log(`Profile Saved [${name}]:`, savedPresets[name]);
+        await showModal("Success", `Saved preset "${name}"`);
+      });
+
+      ui.btnSaveAs.addEventListener("click", async () => {
+        const name = await showModal("Save As", "Enter new preset name:", true);
+        if (name) {
+          if (name === "Default") {
+            await showModal("Error", "Cannot create a preset named 'Default'.");
+            return;
+          }
+          savedPresets[name] = { ...PARAMS };
+          savePresetsToStorage();
+          populatePresetDropdown();
+          ui.presetSelect.value = name; // Select it
+          console.log(`Profile Saved As [${name}]:`, savedPresets[name]);
+        }
+      });
+
+      ui.btnDelete.addEventListener("click", async () => {
+        const name = ui.presetSelect.value;
+        if (name === "Default") {
+          await showModal("Error", "Cannot delete Default preset.");
+          return;
+        }
+        const confirmed = await showModal(
+          "Delete Preset",
+          `Are you sure you want to delete "${name}"?`,
+          false,
+          true,
+        );
+
+        if (confirmed) {
+          delete savedPresets[name];
+          savePresetsToStorage();
+          populatePresetDropdown();
+          ui.presetSelect.value = "Default";
+          loadSelectedPreset();
+        }
+      });
+
+      // Bind all inputs
       bindInput("seed", ui.seed, displays.seed, true);
       bindInput("detail", ui.detail, displays.detail, true);
       bindInput("scale", ui.scale, displays.scale);
@@ -2185,6 +2702,14 @@
       // Bind Water
       bindInput("waveSpeed", ui.wSpeed, displays.wSpeed);
       bindInput("waveHeight", ui.wHeight, displays.wHeight);
+
+      // Bind Solar
+      bindInput("cycleFlip", ui.flip, null);
+      bindInput("solarEnabled", ui.solar, null);
+      bindInput("hazeDistortion", ui.hazeDist, displays.hazeDist);
+      bindInput("colorVibrance", ui.vib, displays.vib);
+      bindInput("sunriseTemp", ui.sunrise, null);
+      bindInput("sunsetTemp", ui.sunset, null);
 
       bindInput("cloudCoverage", ui.cCov, displays.cCov, true);
       bindInput("cloudAltitude", ui.cAlt, displays.cAlt);
@@ -2226,6 +2751,12 @@
       const baseSunColor = new THREE.Color(0xffdd00);
       const sunsetColor = new THREE.Color(0xff4400);
 
+      // Color interpolation helpers for new sliders
+      const cRiseCold = new THREE.Color(0x4444ff);
+      const cRiseWarm = new THREE.Color(0xffaa00);
+      const cSetOrange = new THREE.Color(0xffaa00);
+      const cSetRed = new THREE.Color(0xff0044);
+
       function animate() {
         requestAnimationFrame(animate);
 
@@ -2258,6 +2789,22 @@
           vecToSun.subVectors(sunWorldPos, camPos);
           vecToPlanet.subVectors(new THREE.Vector3(0, 0, 0), camPos);
 
+          // --- NEW: CALCULATE SUN SIDE FOR SUNRISE/SUNSET DISTINCTION ---
+          // We cross view dir with up vector to get "Right"
+          const viewDir = vecToPlanet.clone().negate().normalize();
+          const camRight = new THREE.Vector3()
+            .crossVectors(viewDir, camera.up)
+            .normalize();
+          const sunDir = sunWorldPos.clone().normalize();
+
+          // Dot product tells us if sun is on right (>0) or left (<0)
+          // Assuming standard rotation, Right=West(Set), Left=East(Rise)
+          let sunSide = camRight.dot(sunDir);
+
+          if (PARAMS.cycleFlip) {
+            sunSide = -sunSide;
+          }
+
           crossVec.crossVectors(vecToSun, vecToPlanet);
           const perpDist = crossVec.length() / vecToSun.length();
 
@@ -2277,13 +2824,25 @@
             }
           }
 
+          // Calculate dynamic sunset/sunrise colors based on slider
+          const currentSunrise = cRiseCold
+            .clone()
+            .lerp(cRiseWarm, PARAMS.sunriseTemp);
+          const currentSunset = cSetOrange
+            .clone()
+            .lerp(cSetRed, PARAMS.sunsetTemp);
+
           atmoMaterials.forEach((mat) => {
             mat.uniforms.sunPosition.value.copy(sunWorldPos);
             mat.uniforms.uSunsetFactor.value = sunsetFactor;
+            mat.uniforms.uSunSide.value = sunSide; // Pass side to shader
+            mat.uniforms.uTime.value = time; // Pass time for distortion
+            mat.uniforms.sunriseColor.value.copy(currentSunrise);
+            mat.uniforms.sunsetColor.value.copy(currentSunset);
           });
 
           let sunColor = baseSunColor.clone();
-          sunColor.lerp(sunsetColor, sunsetFactor);
+          sunColor.lerp(currentSunset, sunsetFactor); // Use dynamic sunset color for sun mesh too
           sunColor.multiplyScalar(PARAMS.sunBrightness);
           sunMat.color.copy(sunColor);
         }
@@ -2517,6 +3076,9 @@
         renderer.render(scene, camera);
       }
 
+      // Initialize
+      loadPresetsFromStorage();
+      populatePresetDropdown();
       generatePlanet();
       generateStars();
       updateLighting();
