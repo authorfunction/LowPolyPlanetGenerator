@@ -3225,8 +3225,79 @@
 
           sunMat.uniforms.uSolarEnabled.value = PARAMS.solarEnabled ? 1.0 : 0.0;
         }
+        if (cloudsMesh && !isPaused) {
+          const cloudsRotation = cloudsMesh.rotation.y;
 
-        // ... rest of animate loop ...
+          cloudsMesh.children.forEach((cloud) => {
+            cloud.rotation.z += cloud.userData.rotSpeed * delta;
+            const bob =
+              Math.sin(
+                time * cloud.userData.bobSpeed + cloud.userData.bobOffset,
+              ) * 0.05;
+            const r = cloud.userData.baseRadius + bob;
+            cloud.position.setLength(r);
+
+            if (currentSimplex) {
+              tempVec.copy(cloud.position).normalize().multiplyScalar(4.0);
+              tempVec.applyAxisAngle(
+                new THREE.Vector3(0, 1, 0),
+                cloudsRotation,
+              );
+              const x = tempVec.x;
+              const y = tempVec.y;
+              const z = tempVec.z;
+              const n1 = currentSimplex.noise(
+                x * PARAMS.scale * 0.1,
+                y * PARAMS.scale * 0.1,
+                z * PARAMS.scale * 0.1,
+              );
+              const n2 =
+                currentSimplex.noise(
+                  x * PARAMS.scale * 0.3,
+                  y * PARAMS.scale * 0.3,
+                  z * PARAMS.scale * 0.3,
+                ) * 0.5;
+              const n3 =
+                currentSimplex.noise(
+                  x * PARAMS.scale * 1.0,
+                  y * PARAMS.scale * 1.0,
+                  z * PARAMS.scale * 1.0,
+                ) * 0.2;
+              let noiseVal = Math.max(-0.5, n1 + n2 + n3);
+              const displacement = 1 + noiseVal * PARAMS.height * 0.2;
+              const surfaceH = (displacement * 4 - 4.0) / (PARAMS.height * 0.8);
+
+              let targetScale = 1.0;
+              let raining = false;
+              if (surfaceH > 0.6) {
+                raining = true;
+                targetScale = 0.2;
+              }
+
+              cloud.userData.currentScale = THREE.MathUtils.lerp(
+                cloud.userData.currentScale,
+                targetScale,
+                delta * 0.5,
+              );
+              const s = cloud.userData.currentScale;
+              cloud.scale.set(s, s, s);
+
+              const rainGroup = cloud.userData.rainGroup;
+              if (rainGroup) {
+                if (raining && s > 0.19) {
+                  rainGroup.visible = true;
+                  rainGroup.children.forEach((drop) => {
+                    drop.position.z += drop.userData.speed * delta * 3.0;
+                    if (drop.position.z > 2.5)
+                      drop.position.z = -0.1 - Math.random() * 0.2;
+                  });
+                } else {
+                  rainGroup.visible = false;
+                }
+              }
+            }
+          });
+        }
         if (!isPaused) {
           starsGroup.rotation.y -= delta * 0.02;
         }
