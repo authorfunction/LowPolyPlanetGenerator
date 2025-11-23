@@ -6,6 +6,7 @@ import {
   BIOMES,
   HORIZON_UNIFORMS,
   WATER_UNIFORMS,
+  CLOUD_UNIFORMS, // <--- Add this import
   PRESET_KEY,
 } from "./config.js";
 import { SimplexNoise, createPRNG } from "./utils.js";
@@ -17,6 +18,8 @@ import {
   SUN_FRAGMENT,
   ATMO_VERTEX,
   ATMO_FRAGMENT,
+  CLOUD_VERTEX, // <--- Add this
+  CLOUD_FRAGMENT, // <--- Add this
 } from "./shaders.js";
 
 // --- STATE MANAGEMENT ---
@@ -676,22 +679,38 @@ function generatePlanet() {
     planetGroup.add(atmoGroup);
   }
 
+  // ... inside generatePlanet() ...
+
   if (cloudsMesh) {
     planetGroup.remove(cloudsMesh);
     cloudsMesh = null;
   }
-  cloudsMesh = new THREE.Group();
-  const puffGeo = new THREE.IcosahedronGeometry(1, 0);
-  const cloudMat = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    flatShading: true,
-    roughness: 0.4,
-    metalness: 0.1,
-    opacity: 0.95,
-    transparent: true,
-  });
-  setupHorizonShader(cloudMat);
 
+  cloudsMesh = new THREE.Group();
+
+  // 1. New Cloud Shader Material
+  // We use the same 'sunWorldPos' logic we use for atmosphere to light the clouds
+  const cloudShaderMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uBaseColor: { value: new THREE.Color(0xffffff) }, // Pure white center
+      uRimColor: { value: new THREE.Color(0xddeeff) }, // Blueish-white edges
+      uOpacity: { value: 0.9 },
+      sunPosition: { value: new THREE.Vector3(10, 5, 0) }, // Will update in animate
+      uTime: { value: 0.0 },
+      // --- ADD THESE 3 LINES ---
+      // We link directly to the global objects so they auto-update!
+      uHorizonColor: HORIZON_UNIFORMS.uHorizonColor,
+      uHorizonStrength: HORIZON_UNIFORMS.uHorizonStrength,
+      uHorizonPower: HORIZON_UNIFORMS.uHorizonPower,
+      uCloudHazeMultiplier: CLOUD_UNIFORMS.uCloudHazeMultiplier,
+    },
+    vertexShader: CLOUD_VERTEX,
+    fragmentShader: CLOUD_FRAGMENT,
+    transparent: true,
+    // side: THREE.DoubleSide // Optional: makes them look thicker but might cause artifacts
+  });
+
+  // We keep the rain geometry the same
   const rainGeo = new THREE.BoxGeometry(0.02, 0.6, 0.02);
   rainGeo.rotateX(Math.PI / 2);
   const rainMat = new THREE.MeshBasicMaterial({
@@ -699,62 +718,109 @@ function generatePlanet() {
     transparent: true,
     opacity: 0.4,
   });
+
   const minCloudHeight = 4.0 * (1 + PARAMS.height * 0.2) + 0.2;
   const cloudBaseRadius = minCloudHeight + PARAMS.cloudAltitude * 1.5;
   const cloudCount = Math.floor(PARAMS.cloudCoverage);
 
+  // Geometry for the puffs (Dodecahedron looks slightly softer than Icosahedron at low detail)
+  const puffGeo = new THREE.DodecahedronGeometry(1, 0);
+
   for (let i = 0; i < cloudCount; i++) {
     const cloud = new THREE.Group();
+
+    // 2. Random Position on Sphere
     const phi = Math.acos(-1 + (2 * i) / cloudCount);
     const theta = Math.sqrt(cloudCount * Math.PI) * phi;
     const phiR = phi + (Math.random() - 0.5) * 0.5;
     const thetaR = theta + (Math.random() - 0.5) * 0.5;
-    cloud.position.setFromSphericalCoords(cloudBaseRadius, phiR, thetaR);
-    cloud.lookAt(0, 0, 0);
 
-    const puffs = 3 + Math.floor(Math.random() * 5);
-    const spread = PARAMS.cloudSize * 0.6;
-    for (let j = 0; j < puffs; j++) {
-      const puff = new THREE.Mesh(puffGeo, cloudMat);
-      const lx = (Math.random() - 0.5) * spread * 2.5;
-      const ly = (Math.random() - 0.5) * spread * 1.5;
-      const lz = (Math.random() - 0.5) * spread * 0.2;
-      puff.position.set(lx, ly, lz);
-      const s = PARAMS.cloudSize * (0.15 + Math.random() * 0.25);
-      puff.scale.set(s, s, s);
-      puff.rotation.set(
-        Math.random() * Math.PI,
-        Math.random() * Math.PI,
-        Math.random() * Math.PI,
+    cloud.position.setFromSphericalCoords(cloudBaseRadius, phiR, thetaR);
+    cloud.lookAt(0, 0, 0); // Z-axis now points at the planet center
+
+    // 3. Create the "Cluster"
+
+    // A. Main Body
+    const mainPuff = new THREE.Mesh(puffGeo, cloudShaderMat);
+
+    // FIX 1: Squash the Z-axis (radial), not the Y-axis.
+    // This flattens the cloud against the atmosphere layer.
+    mainPuff.scale.set(1.0, 1.0, 0.6);
+
+    // FIX 2: Rotate mostly around Z (spinning flat on the sky)
+    // Restrict X/Y rotation so it doesn't tilt into the ground
+    mainPuff.rotation.z = Math.random() * Math.PI * 2;
+    mainPuff.rotation.x = (Math.random() - 0.5) * 0.3;
+    mainPuff.rotation.y = (Math.random() - 0.5) * 0.3;
+
+    cloud.add(mainPuff);
+
+    // B. Child Puffs
+    const numChildren = 3 + Math.floor(Math.random() * 3);
+    for (let k = 0; k < numChildren; k++) {
+      const child = new THREE.Mesh(puffGeo, cloudShaderMat);
+
+      const dist = 0.6 + Math.random() * 0.6;
+      const angle = Math.random() * Math.PI * 2;
+
+      // FIX 3: Spread children in X and Y (Tangent Plane)
+      // Z is the "height" or "thickness" of the cloud layer
+      child.position.set(
+        Math.cos(angle) * dist, // Spread Horizontal
+        Math.sin(angle) * dist, // Spread Vertical (Tangent)
+        (Math.random() - 0.5) * 0.3, // Thickness (Radial) - Keep thin
       );
-      cloud.add(puff);
+
+      const scale = 0.4 + Math.random() * 0.4;
+      // Flatten children radially as well
+      child.scale.set(scale, scale, scale * 0.6);
+      child.rotation.z = Math.random() * Math.PI * 2;
+
+      cloud.add(child);
     }
+
+    // 4. Scale the whole cloud based on UI
+    const globalScale = PARAMS.cloudSize * (0.8 + Math.random() * 0.4);
+    cloud.scale.set(globalScale, globalScale, globalScale);
+
+    // --- RAIN SYSTEM ---
     const rainGroup = new THREE.Group();
     const drops = 8;
     for (let r = 0; r < drops; r++) {
       const drop = new THREE.Mesh(rainGeo, rainMat);
+
       drop.position.set(
-        (Math.random() - 0.5) * spread * 1.5,
-        (Math.random() - 0.5) * spread * 1.5,
-        (Math.random() - 0.5) * 0.5,
+        (Math.random() - 0.5) * 1.5,
+        (Math.random() - 0.5) * 1.5,
+        0.5 + Math.random() * 0.5,
       );
+
+      // No rotation needed here because rainGeo is already rotated!
+
       drop.userData = { speed: 2 + Math.random() * 3 };
       rainGroup.add(drop);
     }
+
     rainGroup.visible = false;
     cloud.add(rainGroup);
+
     cloud.userData = {
-      rotSpeed: (Math.random() - 0.5) * 0.2,
+      rotSpeed: (Math.random() - 0.5) * 0.05,
       bobSpeed: 1 + Math.random(),
       bobOffset: Math.random() * Math.PI * 2,
       baseRadius: cloudBaseRadius,
-      originalScale: 1.0,
-      currentScale: 1.0,
+      originalScale: globalScale,
+      currentScale: globalScale,
       rainGroup: rainGroup,
+      material: cloudShaderMat,
     };
+
     cloudsMesh.add(cloud);
   }
   planetGroup.add(cloudsMesh);
+
+  // ... continue with generateVegetation ...
+
   generateVegetation(4, simplex, prng);
   createCharacters();
 }
@@ -851,6 +917,8 @@ function populatePresetDropdown() {
 function updateDependentShaders(key, val) {
   if (key === "horizonStrength") HORIZON_UNIFORMS.uHorizonStrength.value = val;
   if (key === "horizonPower") HORIZON_UNIFORMS.uHorizonPower.value = val;
+  if (key === "cloudHazeMultiplier")
+    CLOUD_UNIFORMS.uCloudHazeMultiplier.value = val;
   if (key === "waveSpeed") WATER_UNIFORMS.uWaveSpeed.value = val;
   if (key === "waveHeight") WATER_UNIFORMS.uWaveHeight.value = val;
   if (key === "sunDistortion") sunMat.uniforms.uVertexDistortion.value = val;
@@ -917,6 +985,7 @@ function applyParamsToUI() {
   setVal(ui.cSize, PARAMS.cloudSize, displays.cSize);
   setVal(ui.hStr, PARAMS.horizonStrength, displays.hStr);
   setVal(ui.hPow, PARAMS.horizonPower, displays.hPow);
+  setVal(ui.chaze, PARAMS.cloudHazeMultiplier, displays.chaze); // <--- Add this
   setVal(ui.wSpeed, PARAMS.waveSpeed, displays.wSpeed);
   setVal(ui.wHeight, PARAMS.waveHeight, displays.wHeight);
   //setVal(ui.hazeDist, PARAMS.hazeDistortion, displays.hazeDist); <== DELETED
@@ -1019,6 +1088,7 @@ bindInput("hazeIntensity", ui.hint, displays.hint);
 bindInput("hazeFalloff", ui.hfall, displays.hfall);
 bindInput("horizonStrength", ui.hStr, displays.hStr);
 bindInput("horizonPower", ui.hPow, displays.hPow);
+bindInput("cloudHazeMultiplier", ui.chaze, displays.chaze); // <--- Add this
 bindInput("waveSpeed", ui.wSpeed, displays.wSpeed);
 bindInput("waveHeight", ui.wHeight, displays.wHeight);
 bindInput("cycleFlip", ui.flip, null);
@@ -1290,12 +1360,17 @@ function animate() {
         let noiseVal = Math.max(-0.5, n1 + n2 + n3);
         const displacement = 1 + noiseVal * PARAMS.height * 0.2;
         const surfaceH = (displacement * 4 - 4.0) / (PARAMS.height * 0.8);
-        let targetScale = 1.0;
+
+        // FIX: Use the cloud's stored scale as the default target
+        let targetScale = cloud.userData.originalScale;
         let raining = false;
+
+        // Optional: If you want clouds to shrink when hitting mountains/rain
         if (surfaceH > 0.6) {
           raining = true;
-          targetScale = 0.2;
+          targetScale = cloud.userData.originalScale * 0.5; // Shrink relative to size
         }
+
         cloud.userData.currentScale = THREE.MathUtils.lerp(
           cloud.userData.currentScale,
           targetScale,
@@ -1316,6 +1391,12 @@ function animate() {
             rainGroup.visible = false;
           }
         }
+      }
+      // NEW: Update shader uniform for this cloud cluster
+      // (Since they share a material, updating one updates all, but we need to do it once per frame)
+      if (cloud.children.length > 0 && cloud.children[0].material.uniforms) {
+        cloud.children[0].material.uniforms.sunPosition.value.copy(sunWorldPos);
+        cloud.children[0].material.uniforms.uTime.value = time;
       }
     });
   }

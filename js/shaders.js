@@ -281,3 +281,80 @@ export const ATMO_FRAGMENT = `
         gl_FragColor = vec4(finalColor, alpha);
     }
 `;
+
+// --- CLOUD SHADERS ---
+
+export const CLOUD_VERTEX = `
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    varying vec3 vWorldPosition;
+
+    uniform float uTime;
+
+    void main() {
+        vUv = uv;
+        vNormal = normalize(normalMatrix * normal);
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        vViewPosition = -mvPosition.xyz;
+
+        // Calculate world position for height-based logic if needed
+        vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+
+        gl_Position = projectionMatrix * mvPosition;
+    }
+`;
+
+export const CLOUD_FRAGMENT = `
+    uniform vec3 uBaseColor;
+    uniform vec3 uRimColor;
+    uniform float uOpacity;
+    uniform vec3 sunPosition;
+
+    // --- HORIZON FOG UNIFORMS ---
+    uniform vec3 uHorizonColor;
+    uniform float uHorizonStrength;
+    uniform float uHorizonPower;
+
+    // NEW UNIFORM
+    uniform float uCloudHazeMultiplier;
+
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    varying vec3 vWorldPosition;
+
+    void main() {
+        vec3 normal = normalize(vNormal);
+        vec3 viewDir = normalize(vViewPosition);
+
+        // 1. Basic Lighting
+        vec3 sunDir = normalize(sunPosition);
+        float NdotL = dot(normal, sunDir);
+        float lightIntensity = smoothstep(-0.5, 1.0, NdotL);
+
+        // 2. Fresnel / Rim Light
+        float fresnel = 1.0 - abs(dot(viewDir, normal));
+        fresnel = pow(fresnel, 2.0);
+
+        vec3 finalColor = mix(uBaseColor * 0.9, uBaseColor, lightIntensity);
+        finalColor += uRimColor * fresnel * 0.5;
+
+        // 3. APPLY ATMOSPHERIC HAZE
+        vec3 hNormal = normalize(vWorldPosition);
+        vec3 hView = normalize(cameraPosition - vWorldPosition);
+
+        float hDot = max(0.0, dot(hNormal, hView));
+        float hFactor = 1.0 - hDot;
+        hFactor = pow(hFactor, uHorizonPower);
+
+        // APPLY MULTIPLIER HERE
+        float hIntensity = hFactor * uHorizonStrength * uCloudHazeMultiplier;
+
+        // Clamp to prevent visual artifacts if user cranks slider to 5x
+        hIntensity = min(1.0, hIntensity);
+
+        finalColor = mix(finalColor, uHorizonColor, hIntensity);
+
+        gl_FragColor = vec4(finalColor, uOpacity);
+    }
+`;

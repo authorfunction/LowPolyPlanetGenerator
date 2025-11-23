@@ -50,6 +50,7 @@ export const ui = {
   // New UI
   hStr: document.getElementById("h-str"),
   hPow: document.getElementById("h-pow"),
+  chaze: document.getElementById("chaze"),
   wSpeed: document.getElementById("wspeed"),
   wHeight: document.getElementById("wheight"),
   // Solar Effects
@@ -95,6 +96,7 @@ export const displays = {
   // New Display
   hStr: document.getElementById("val-h-str"),
   hPow: document.getElementById("val-h-pow"),
+  chaze: document.getElementById("val-chaze"),
   wSpeed: document.getElementById("val-wspeed"),
   wHeight: document.getElementById("val-wheight"),
   sunDist: document.getElementById("val-sun-dist"),

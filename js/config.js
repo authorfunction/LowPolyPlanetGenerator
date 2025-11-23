@@ -7,6 +7,10 @@ export const HORIZON_UNIFORMS = {
   uHorizonPower: { value: 7.0 },
 };
 
+export const CLOUD_UNIFORMS = {
+  uCloudHazeMultiplier: { value: 1.0 },
+};
+
 export const WATER_UNIFORMS = {
   uTime: { value: 0.0 },
   uWaveSpeed: { value: 1.0 },
@@ -132,6 +136,7 @@ export const DEFAULT_PARAMS = {
   hazeSpread: 1.0,
   hazeIntensity: 0.7,
   hazeFalloff: 30.0,
+  cloudHazeMultiplier: 2.0,
   cloudCoverage: 20,
   cloudAltitude: 0.4,
   cloudSize: 1.0,
