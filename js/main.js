@@ -697,12 +697,16 @@ function generatePlanet() {
       uOpacity: { value: 0.9 },
       sunPosition: { value: new THREE.Vector3(10, 5, 0) }, // Will update in animate
       uTime: { value: 0.0 },
+      // NEW LIGHTING UNIFORMS
+      uSunColor: { value: new THREE.Color(0xffffff) },
+      uAmbientColor: { value: new THREE.Color(0x334455) },
       // --- ADD THESE 3 LINES ---
       // We link directly to the global objects so they auto-update!
       uHorizonColor: HORIZON_UNIFORMS.uHorizonColor,
       uHorizonStrength: HORIZON_UNIFORMS.uHorizonStrength,
       uHorizonPower: HORIZON_UNIFORMS.uHorizonPower,
       uCloudHazeMultiplier: CLOUD_UNIFORMS.uCloudHazeMultiplier,
+      uCloudLightWrap: CLOUD_UNIFORMS.uCloudLightWrap, // <--- Add this
     },
     vertexShader: CLOUD_VERTEX,
     fragmentShader: CLOUD_FRAGMENT,
@@ -919,6 +923,7 @@ function updateDependentShaders(key, val) {
   if (key === "horizonPower") HORIZON_UNIFORMS.uHorizonPower.value = val;
   if (key === "cloudHazeMultiplier")
     CLOUD_UNIFORMS.uCloudHazeMultiplier.value = val;
+  if (key === "cloudLightWrap") CLOUD_UNIFORMS.uCloudLightWrap.value = val; // <--- Add this
   if (key === "waveSpeed") WATER_UNIFORMS.uWaveSpeed.value = val;
   if (key === "waveHeight") WATER_UNIFORMS.uWaveHeight.value = val;
   if (key === "sunDistortion") sunMat.uniforms.uVertexDistortion.value = val;
@@ -986,6 +991,7 @@ function applyParamsToUI() {
   setVal(ui.hStr, PARAMS.horizonStrength, displays.hStr);
   setVal(ui.hPow, PARAMS.horizonPower, displays.hPow);
   setVal(ui.chaze, PARAMS.cloudHazeMultiplier, displays.chaze); // <--- Add this
+  setVal(ui.cwrap, PARAMS.cloudLightWrap, displays.cwrap); // <--- Add this
   setVal(ui.wSpeed, PARAMS.waveSpeed, displays.wSpeed);
   setVal(ui.wHeight, PARAMS.waveHeight, displays.wHeight);
   //setVal(ui.hazeDist, PARAMS.hazeDistortion, displays.hazeDist); <== DELETED
@@ -1089,6 +1095,7 @@ bindInput("hazeFalloff", ui.hfall, displays.hfall);
 bindInput("horizonStrength", ui.hStr, displays.hStr);
 bindInput("horizonPower", ui.hPow, displays.hPow);
 bindInput("cloudHazeMultiplier", ui.chaze, displays.chaze); // <--- Add this
+bindInput("cloudLightWrap", ui.cwrap, displays.cwrap); // <--- Add this
 bindInput("waveSpeed", ui.wSpeed, displays.wSpeed);
 bindInput("waveHeight", ui.wHeight, displays.wHeight);
 bindInput("cycleFlip", ui.flip, null);
@@ -1322,10 +1329,43 @@ function animate() {
     sunMat.uniforms.uSunsetFactor.value = sunsetFactor;
     sunMat.uniforms.uVertexDistortion.value = PARAMS.sunDistortion;
     sunMat.uniforms.uSolarEnabled.value = PARAMS.solarEnabled ? 1.0 : 0.0;
-  }
+    // --- UPDATE CLOUDS WITH SOLAR COLORS ---
+    if (cloudsMesh && cloudsMesh.children.length > 0) {
+      const firstCloudMat = cloudsMesh.children[0].children[0].material;
+      if (firstCloudMat.uniforms.uSunColor) {
+        // 1. Sun Color (Direct Light)
+        // Mix White (Day) -> TargetTint (Sunset) based on sunset factor
+        // We boost tint saturation slightly for clouds so they catch color early
+        let cloudSunColor = new THREE.Color(0xffffff);
+        cloudSunColor.lerp(targetTint, sunsetFactor * 1.2);
+        firstCloudMat.uniforms.uSunColor.value.copy(cloudSunColor);
+
+        // 2. Ambient Color (Shadow Side)
+        // Day: Blue-Grey (0x445566) -> Night: Dark Violet/Black (0x111122)
+        let dayAmb = new THREE.Color(0x445566);
+        let setAmb = new THREE.Color(0x110511); // Dark purple shadow
+        let currentAmb = dayAmb.lerp(setAmb, sunsetFactor);
+
+        // Apply night darkness param
+        currentAmb.multiplyScalar(0.5 + (1.0 - PARAMS.nightDarkness) * 0.5);
+
+        firstCloudMat.uniforms.uAmbientColor.value.copy(currentAmb);
+      }
+    }
+  } // End of sunOrbit block
 
   if (cloudsMesh && !isPaused) {
     const cloudsRotation = cloudsMesh.rotation.y;
+
+    // --- 1. NEW LOCATION: Update Material Uniforms ONCE per frame ---
+    // Since all clouds share the same material, we don't need to do this inside the loop
+    if (cloudsMesh.children.length > 0) {
+      // Grab the material from the first cloud's first puff
+      const mat = cloudsMesh.children[0].children[0].material;
+      mat.uniforms.sunPosition.value.copy(sunWorldPos);
+      mat.uniforms.uTime.value = time;
+    }
+
     cloudsMesh.children.forEach((cloud) => {
       cloud.rotation.z += cloud.userData.rotSpeed * delta;
       const bob =
@@ -1392,12 +1432,8 @@ function animate() {
           }
         }
       }
-      // NEW: Update shader uniform for this cloud cluster
-      // (Since they share a material, updating one updates all, but we need to do it once per frame)
-      if (cloud.children.length > 0 && cloud.children[0].material.uniforms) {
-        cloud.children[0].material.uniforms.sunPosition.value.copy(sunWorldPos);
-        cloud.children[0].material.uniforms.uTime.value = time;
-      }
+
+      // --- DELETED THE MATERIAL UPDATE BLOCK HERE ---
     });
   }
   if (!isPaused) starsGroup.rotation.y -= delta * 0.02;
@@ -1478,3 +1514,31 @@ updateLighting();
 generateStars(); // Ensure stars generate on load
 generatePlanet(); // Starts the loop essentially
 animate();
+
+// --- DEV TOOL: Export Config ---
+window.exportConfig = function () {
+  // 1. Convert the current PARAMS object to a formatted string
+  // The 'null, 2' arguments make it pretty-print with 2-space indentation
+  const jsonString = JSON.stringify(PARAMS, null, 2);
+
+  // 2. Wrap it in the actual code syntax for config.js
+  const codeBlock = `export const DEFAULT_PARAMS = ${jsonString};`;
+
+  // 3. Log it cleanly
+  console.log(
+    "%cCopy the code below:",
+    "color: #4ade80; font-weight: bold; font-size: 14px;",
+  );
+  console.log(codeBlock);
+
+  // 4. (Optional) Attempt to copy to clipboard automatically
+  try {
+    navigator.clipboard.writeText(codeBlock);
+    console.log(
+      "%c(Also copied to clipboard!)",
+      "color: #888; font-style: italic;",
+    );
+  } catch (err) {
+    // Ignore clipboard errors if browser blocks it
+  }
+};

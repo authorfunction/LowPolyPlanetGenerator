@@ -307,17 +307,17 @@ export const CLOUD_VERTEX = `
 
 export const CLOUD_FRAGMENT = `
     uniform vec3 uBaseColor;
-    uniform vec3 uRimColor;
     uniform float uOpacity;
     uniform vec3 sunPosition;
 
-    // --- HORIZON FOG UNIFORMS ---
+    uniform vec3 uSunColor;
+    uniform vec3 uAmbientColor;
+
     uniform vec3 uHorizonColor;
     uniform float uHorizonStrength;
     uniform float uHorizonPower;
-
-    // NEW UNIFORM
     uniform float uCloudHazeMultiplier;
+    uniform float uCloudLightWrap;
 
     varying vec3 vNormal;
     varying vec3 vViewPosition;
@@ -326,31 +326,56 @@ export const CLOUD_FRAGMENT = `
     void main() {
         vec3 normal = normalize(vNormal);
         vec3 viewDir = normalize(vViewPosition);
-
-        // 1. Basic Lighting
         vec3 sunDir = normalize(sunPosition);
+
+        // --- 1. PLANETARY SHADOW MASK (The Fix) ---
+        // Calculate where this cloud is relative to the planet's day/night cycle
+        vec3 planetNormal = normalize(vWorldPosition);
+        float globalAlignment = dot(planetNormal, sunDir);
+
+        // Create a mask that fades out clouds on the night side
+        // We use the same Wrap slider to control how far the "Day" extends
+        // If Wrap is -0.5, this mask cuts off clouds even before they hit the middle
+        float globalMask = smoothstep(-uCloudLightWrap - 0.1, -uCloudLightWrap + 0.4, globalAlignment);
+
+        // --- 2. Local Diffuse Lighting ---
         float NdotL = dot(normal, sunDir);
-        float lightIntensity = smoothstep(-0.5, 1.0, NdotL);
+        float lightingTerm = NdotL + uCloudLightWrap;
+        float lightIntensity = smoothstep(0.0, 0.4, lightingTerm);
 
-        // 2. Fresnel / Rim Light
+        // APPLY THE MASK: Force sun intensity to 0 on the dark side
+        lightIntensity *= globalMask;
+
+        vec3 bodyColor = mix(uAmbientColor, uSunColor, lightIntensity);
+
+        // --- 3. Rim Lighting ---
         float fresnel = 1.0 - abs(dot(viewDir, normal));
-        fresnel = pow(fresnel, 2.0);
+        fresnel = pow(fresnel, 1.5);
 
-        vec3 finalColor = mix(uBaseColor * 0.9, uBaseColor, lightIntensity);
-        finalColor += uRimColor * fresnel * 0.5;
+        vec3 sunRim = uSunColor * fresnel * 0.8;
+        vec3 ambRim = uAmbientColor * fresnel * 0.5;
 
-        // 3. APPLY ATMOSPHERIC HAZE
+        // Mix rims based on the masked intensity
+        vec3 finalRim = mix(ambRim, sunRim, lightIntensity);
+
+        // --- 4. Forward Scattering ---
+        float sunViewDot = dot(viewDir, sunDir);
+        float forwardScatter = max(0.0, sunViewDot);
+        forwardScatter = pow(forwardScatter, 6.0);
+
+        // Also mask the scatter so night clouds don't glow from behind
+        vec3 scatterColor = uSunColor * forwardScatter * 2.0 * globalMask;
+
+        // Combine
+        vec3 finalColor = bodyColor + finalRim + scatterColor;
+
+        // --- 5. Atmospheric Haze ---
         vec3 hNormal = normalize(vWorldPosition);
         vec3 hView = normalize(cameraPosition - vWorldPosition);
-
         float hDot = max(0.0, dot(hNormal, hView));
         float hFactor = 1.0 - hDot;
         hFactor = pow(hFactor, uHorizonPower);
-
-        // APPLY MULTIPLIER HERE
         float hIntensity = hFactor * uHorizonStrength * uCloudHazeMultiplier;
-
-        // Clamp to prevent visual artifacts if user cranks slider to 5x
         hIntensity = min(1.0, hIntensity);
 
         finalColor = mix(finalColor, uHorizonColor, hIntensity);
