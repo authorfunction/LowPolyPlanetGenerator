@@ -123,7 +123,7 @@ export const DEFAULT_PARAMS = {
   waterLevel: 0.1,
   rotationSpeed: 0.1,
   cloudSpeed: 0.1,
-  sunSpeed: 0.5,
+  sunSpeed: 0.1, //0.5,
   nightDarkness: 0.9,
   haloStrength: 1,
   sunReddening: 1.1, //1.5,

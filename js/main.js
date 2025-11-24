@@ -40,8 +40,11 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000,
 );
-camera.position.z = 16;
-camera.position.y = 4;
+//camera.position.z = 16;
+//camera.position.y = 4;
+// Hardcoded Camera Start
+// X=-5 (Left), Y=9 (High up), Z=15 (Back)
+camera.position.set(-5, -1, 15);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -67,6 +70,8 @@ scene.add(ambientLight);
 // --- SCENE OBJECTS ---
 const sunOrbit = new THREE.Group();
 scene.add(sunOrbit);
+// Rotate sun to be behind-right of the planet
+sunOrbit.rotation.y = 6.8;
 
 const sunGeo = new THREE.IcosahedronGeometry(1.5, 4);
 
@@ -1372,6 +1377,13 @@ window.addEventListener("keydown", (e) => {
     ui.pauseIndicator.classList.toggle("visible", isPaused);
   }
 });
+let isSunFrozen = false;
+window.addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() === "f") {
+    isSunFrozen = !isSunFrozen;
+    //ui.pauseIndicator.classList.toggle("visible", isPaused);
+  }
+});
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -1402,7 +1414,7 @@ function animate() {
 
   if (!isPaused) {
     planetGroup.rotation.y += PARAMS.rotationSpeed * delta * 0.5;
-    if (sunOrbit) {
+    if (sunOrbit && !isSunFrozen) {
       sunOrbit.rotation.y += PARAMS.sunSpeed * delta;
       sunMesh.rotation.z -= delta * 0.5;
       sunMesh.rotation.x -= delta * 0.2;
