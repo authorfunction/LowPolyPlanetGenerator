@@ -631,10 +631,10 @@ function generatePlanet() {
 
     // OVERRIDE: VOLCANO BIOME
     // If close to pole, make it dark rock (Volcano Cone)
-    if (poleDist < 2.0 && h > PARAMS.waterLevel) {
+    if (poleDist < 1.5 && h > PARAMS.waterLevel) {
       colorHex = 0x221111; // Dark burnt rock
     }
-    // If extremely close (Crater Rim), make it reddish
+    //  If extremely close (Crater Rim), make it reddish
     if (poleDist < 0.6) {
       colorHex = 0x551100;
     }
@@ -932,25 +932,45 @@ function generatePlanet() {
     planetGroup.remove(eruptionGroup);
   }
   eruptionGroup = new THREE.Group();
-  rocks = []; // Clear old rocks
+  rocks = [];
 
-  // Create a pool of rocks (InstancedMesh is better, but Group is easier for physics logic here)
-  // Let's use simple meshes for simplicity in reading the physics code
   const rockGeo = new THREE.DodecahedronGeometry(0.1, 0);
-  const rockMat = new THREE.MeshStandardMaterial({
-    color: 0x333333,
+
+  // 1. Define two distinct materials
+  // A. Glowing Magma (Hot)
+  const magmaMat = new THREE.MeshStandardMaterial({
+    color: 0x111111,
     emissive: 0xff4400,
-    emissiveIntensity: 0.5,
+    emissiveIntensity: 0.8,
     flatShading: true,
   });
 
-  for (let i = 0; i < 30; i++) {
-    const rock = new THREE.Mesh(rockGeo, rockMat);
+  // B. Cold Ash Rock (Smoke/Debris)
+  const ashMat = new THREE.MeshStandardMaterial({
+    color: 0x222222, // Dark Grey
+    roughness: 1.0, // Very matte
+    flatShading: true,
+  });
+
+  for (let i = 0; i < 40; i++) {
+    // Increased count slightly
+
+    // 2. Randomly pick Hot or Cold
+    const isMagma = Math.random() > 0.4; // 60% Magma, 40% Rock
+    const mat = isMagma ? magmaMat : ashMat;
+
+    const rock = new THREE.Mesh(rockGeo, mat);
     rock.visible = false;
+
+    // 3. Randomize Scale for variety
+    const s = 0.8 + Math.random() * 0.6;
+    rock.scale.set(s, s, s);
+
     rock.userData = {
       velocity: new THREE.Vector3(),
       active: false,
       rotSpeed: new THREE.Vector3(),
+      isMagma: isMagma, // Store type in case we want specific physics later
     };
     eruptionGroup.add(rock);
     rocks.push(rock);

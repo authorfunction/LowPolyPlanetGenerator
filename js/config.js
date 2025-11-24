@@ -162,9 +162,9 @@ export const DEFAULT_PARAMS = {
   // VOLCANO SETTINGS
   volcanoHeight: 1.0, // How high the mountain is
   volcanoFrequency: 3.0, // Seconds between eruptions
-  volcanoForce: 5.0, // How high rocks shoot
-  lavaSpeed: 0.5, // How fast the lava bubbles
-  lavaBrightness: 2.0, // Intensity of the glow
+  volcanoForce: 8.0, // How high rocks shoot
+  lavaSpeed: 3.8, // How fast the lava bubbles
+  lavaBrightness: 3.0, // Intensity of the glow
 };
 
 export const PARAMS = { ...DEFAULT_PARAMS };
