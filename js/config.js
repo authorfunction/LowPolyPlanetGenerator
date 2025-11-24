@@ -158,6 +158,13 @@ export const DEFAULT_PARAMS = {
   sunriseTintStrength: 1,
   sunsetTintStrength: 1.2,
   tintBrightnessDrop: 0.65,
+
+  // VOLCANO SETTINGS
+  volcanoHeight: 1.0, // How high the mountain is
+  volcanoFrequency: 3.0, // Seconds between eruptions
+  volcanoForce: 5.0, // How high rocks shoot
+  lavaSpeed: 0.5, // How fast the lava bubbles
+  lavaBrightness: 2.0, // Intensity of the glow
 };
 
 export const PARAMS = { ...DEFAULT_PARAMS };

@@ -383,3 +383,55 @@ export const CLOUD_FRAGMENT = `
         gl_FragColor = vec4(finalColor, uOpacity);
     }
 `;
+// --- LAVA SHADER ---
+
+export const LAVA_VERTEX = `
+    varying vec2 vUv;
+    varying vec3 vPosition;
+    uniform float uTime;
+    uniform float uSpeed;
+
+    void main() {
+        vUv = uv;
+        vPosition = position;
+
+        // Add a slow "breathing" movement to the surface
+        vec3 pos = position;
+        pos.y += sin(pos.x * 5.0 + uTime * uSpeed) * 0.05;
+        pos.y += cos(pos.z * 5.0 + uTime * uSpeed * 0.8) * 0.05;
+
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    }
+`;
+
+export const LAVA_FRAGMENT = `
+    uniform float uTime;
+    uniform float uSpeed;
+    uniform float uBrightness;
+
+    varying vec2 vUv;
+    varying vec3 vPosition;
+
+    void main() {
+        // Create bubbling pattern using overlapping sine waves
+        float n1 = sin(vPosition.x * 8.0 + uTime * uSpeed);
+        float n2 = sin(vPosition.z * 6.0 - uTime * uSpeed * 1.5);
+        float n3 = sin((vPosition.x + vPosition.z) * 4.0 + uTime * uSpeed * 0.5);
+
+        float bubble = n1 + n2 + n3;
+
+        // Colors: Dark Magma to Bright Yellow
+        vec3 darkColor = vec3(0.3, 0.0, 0.0);
+        vec3 brightColor = vec3(1.0, 0.8, 0.0);
+        vec3 medColor = vec3(1.0, 0.2, 0.0);
+
+        // Mix based on "height" of the wave
+        vec3 finalColor = mix(darkColor, medColor, smoothstep(-2.0, 0.5, bubble));
+        finalColor = mix(finalColor, brightColor, smoothstep(0.5, 2.0, bubble));
+
+        // Add pulsating glow
+        float pulse = 1.0 + sin(uTime * 2.0) * 0.2;
+
+        gl_FragColor = vec4(finalColor * uBrightness * pulse, 1.0);
+    }
+`;

@@ -20,6 +20,8 @@ import {
   ATMO_FRAGMENT,
   CLOUD_VERTEX, // <--- Add this
   CLOUD_FRAGMENT, // <--- Add this
+  LAVA_VERTEX, // <--- ADD
+  LAVA_FRAGMENT, // <--- ADD
 } from "./shaders.js";
 
 // --- STATE MANAGEMENT ---
@@ -159,6 +161,12 @@ let algenState = {
   moving: false,
   hesitationTimer: 0,
 };
+
+// VOLCANO VARIABLES
+let lavaMesh, eruptionGroup;
+let eruptionTime = 0;
+let isErupting = false;
+let rocks = []; // Array to store particle data
 
 // --- GENERATION LOGIC ---
 
@@ -534,6 +542,13 @@ function generatePlanet() {
 
   for (let i = 0; i < posAttribute.count; i++) {
     vertex.fromBufferAttribute(posAttribute, i);
+
+    // 1. Calculate Distance from North Pole (0, 4, 0)
+    // We assume planet radius is 4.0
+    const northPole = new THREE.Vector3(0, 4, 0);
+    const distToPole = vertex.distanceTo(northPole);
+
+    // 2. Standard Noise (Existing Code)
     const n1 = simplex.noise(
       vertex.x * PARAMS.scale * 0.1,
       vertex.y * PARAMS.scale * 0.1,
@@ -552,7 +567,32 @@ function generatePlanet() {
         vertex.z * PARAMS.scale * 1.0,
       ) * 0.2;
     let noiseVal = Math.max(-0.5, n1 + n2 + n3);
-    const displacement = 1 + noiseVal * PARAMS.height * 0.2;
+
+    // 3. APPLY VOLCANO MODIFIER
+    // If we are close to the pole, override noise to make a mountain
+    let volcanoHeight = 0.0;
+    const volcanoRadius = 2.5;
+
+    if (distToPole < volcanoRadius) {
+      // A. Raise the mountain (Bell Curve)
+      let rise =
+        Math.exp(-distToPole * distToPole) * PARAMS.volcanoHeight * 3.0;
+
+      // B. Dig the crater (Inverted Bell Curve at center)
+      if (distToPole < 0.6) {
+        rise -= Math.exp(-distToPole * 4.0) * PARAMS.volcanoHeight * 3.5;
+      }
+
+      volcanoHeight = rise;
+      // Flatten noise on the volcano cone so it looks smooth/clean
+      // Note: Three.js puts the value FIRST, then min, then max (different order than GLSL!)
+      noiseVal *= THREE.MathUtils.smoothstep(distToPole, 0.5, 2.0);
+    }
+
+    // Combine
+    const displacement =
+      1 + noiseVal * PARAMS.height * 0.2 + volcanoHeight * 0.2;
+
     vertex.multiplyScalar(displacement);
     posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
   }
@@ -568,14 +608,39 @@ function generatePlanet() {
   const color = new THREE.Color();
 
   for (let i = 0; i < count; i++) {
+    // vertex.fromBufferAttribute(posAttr, i);
+    // const dist = vertex.length();
+    // let h = (dist - 4.0) / (PARAMS.height * 0.8);
+    // let colorHex = currentBiome.colors[0].c;
+    // for (let c of currentBiome.colors) {
+    //   if (h >= c.h - PARAMS.waterLevel) colorHex = c.c;
+    // }
     vertex.fromBufferAttribute(posAttr, i);
     const dist = vertex.length();
+
+    // Check distance to North Pole for coloring
+    const poleDist = vertex.distanceTo(new THREE.Vector3(0, 4, 0)); // Approx
+
     let h = (dist - 4.0) / (PARAMS.height * 0.8);
     let colorHex = currentBiome.colors[0].c;
+
+    // Standard Biome Logic
     for (let c of currentBiome.colors) {
       if (h >= c.h - PARAMS.waterLevel) colorHex = c.c;
     }
+
+    // OVERRIDE: VOLCANO BIOME
+    // If close to pole, make it dark rock (Volcano Cone)
+    if (poleDist < 2.0 && h > PARAMS.waterLevel) {
+      colorHex = 0x221111; // Dark burnt rock
+    }
+    // If extremely close (Crater Rim), make it reddish
+    if (poleDist < 0.6) {
+      colorHex = 0x551100;
+    }
+
     color.setHex(colorHex);
+
     const variation = (Math.random() - 0.5) * 0.05;
     color.r += variation;
     color.g += variation;
@@ -823,7 +888,74 @@ function generatePlanet() {
   }
   planetGroup.add(cloudsMesh);
 
-  // ... continue with generateVegetation ...
+  // --- GENERATE LAVA ---
+  if (lavaMesh) {
+    planetGroup.remove(lavaMesh);
+  }
+
+  // Create a disk at the North Pole, slightly below the rim
+  const lavaGeo = new THREE.CircleGeometry(0.5, 16);
+  // Rotate to face up
+  lavaGeo.rotateX(-Math.PI / 2);
+  // FIX: Calculate the actual peak height based on the displacement formula
+  // Radius = 4.0 * (1 + displacement)
+  // Displacement at peak = (volcanoHeight * 3.0) * 0.2
+  const peakDisplacement = PARAMS.volcanoHeight * 3.0 * 0.2;
+  const peakRadius = 4.0 * (1 + peakDisplacement);
+
+  // Position lava slightly below the peak (crater depth)
+  //const lavaHeight = peakRadius * 0.98;
+  const lavaHeight = 4.5 + PARAMS.volcanoHeight * 0.15 * 4.0;
+
+  lavaGeo.translate(0, lavaHeight, 0);
+
+  const lavaMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0.0 },
+      uSpeed: { value: PARAMS.lavaSpeed },
+      uBrightness: { value: PARAMS.lavaBrightness },
+    },
+    vertexShader: LAVA_VERTEX,
+    fragmentShader: LAVA_FRAGMENT,
+  });
+
+  lavaMesh = new THREE.Mesh(lavaGeo, lavaMat);
+  planetGroup.add(lavaMesh);
+
+  // Add a PointLight for the glow
+  const lavaLight = new THREE.PointLight(0xffaa00, 2.0, 4.0);
+  lavaLight.position.set(0, 0.5, 0); // Relative to lava mesh
+  lavaMesh.add(lavaLight);
+
+  // --- GENERATE ERUPTION SYSTEM ---
+  if (eruptionGroup) {
+    planetGroup.remove(eruptionGroup);
+  }
+  eruptionGroup = new THREE.Group();
+  rocks = []; // Clear old rocks
+
+  // Create a pool of rocks (InstancedMesh is better, but Group is easier for physics logic here)
+  // Let's use simple meshes for simplicity in reading the physics code
+  const rockGeo = new THREE.DodecahedronGeometry(0.1, 0);
+  const rockMat = new THREE.MeshStandardMaterial({
+    color: 0x333333,
+    emissive: 0xff4400,
+    emissiveIntensity: 0.5,
+    flatShading: true,
+  });
+
+  for (let i = 0; i < 30; i++) {
+    const rock = new THREE.Mesh(rockGeo, rockMat);
+    rock.visible = false;
+    rock.userData = {
+      velocity: new THREE.Vector3(),
+      active: false,
+      rotSpeed: new THREE.Vector3(),
+    };
+    eruptionGroup.add(rock);
+    rocks.push(rock);
+  }
+  planetGroup.add(eruptionGroup);
 
   generateVegetation(4, simplex, prng);
   createCharacters();
@@ -1436,6 +1568,79 @@ function animate() {
       // --- DELETED THE MATERIAL UPDATE BLOCK HERE ---
     });
   }
+
+  if (!isPaused) {
+    // 1. UPDATE LAVA
+    if (lavaMesh) {
+      lavaMesh.material.uniforms.uTime.value = time;
+    }
+
+    // 2. ERUPTION LOGIC
+    if (time > eruptionTime) {
+      isErupting = true;
+      // Reset timer (randomized slightly)
+      eruptionTime = time + PARAMS.volcanoFrequency + Math.random() * 2.0;
+
+      // Launch a batch of rocks
+      rocks.forEach((rock) => {
+        if (!rock.userData.active && Math.random() > 0.5) {
+          rock.userData.active = true;
+          rock.visible = true;
+
+          // Reset to Crater Center (North Pole relative to planet)
+          // Note: Since planet rotates, we need local coordinates.
+          // North Pole Local is (0, height, 0)
+          // FIX: Spawn at the new peak radius
+          // We recalculate it here or you could store it globally,
+          // but calculating it is cheap.
+          const peakDisp = PARAMS.volcanoHeight * 3.0 * 0.2;
+          //const spawnHeight = 4.0 * (1 + peakDisp);
+          // FIX: Spawn exactly at the lava level we calculated above
+          const spawnHeight = 4.5 + PARAMS.volcanoHeight * 0.15 * 4.0;
+
+          rock.position.set(0, spawnHeight, 0);
+
+          // Random Velocity Up and Out
+          const theta = Math.random() * Math.PI * 2;
+          const spread = 0.5;
+          rock.userData.velocity.set(
+            Math.cos(theta) * spread,
+            PARAMS.volcanoForce * (0.5 + Math.random() * 0.5), // Upward force
+            Math.sin(theta) * spread,
+          );
+
+          rock.userData.rotSpeed.set(
+            Math.random() - 0.5,
+            Math.random() - 0.5,
+            Math.random() - 0.5,
+          );
+        }
+      });
+    }
+
+    // 3. PHYSICS UPDATE
+    rocks.forEach((rock) => {
+      if (rock.userData.active) {
+        // Apply Gravity (Down towards (0,0,0) in local space)
+        // Simple approximation: just pull Y down relative to planet
+        rock.userData.velocity.y -= delta * 9.8;
+
+        // Move
+        rock.position.add(rock.userData.velocity.clone().multiplyScalar(delta));
+
+        // Rotate
+        rock.rotation.x += rock.userData.rotSpeed.x;
+        rock.rotation.y += rock.userData.rotSpeed.y;
+
+        // Collision/Death (If it falls below ground level)
+        if (rock.position.length() < 3.8) {
+          rock.userData.active = false;
+          rock.visible = false;
+        }
+      }
+    });
+  }
+
   if (!isPaused) starsGroup.rotation.y -= delta * 0.02;
 
   controls.update();
