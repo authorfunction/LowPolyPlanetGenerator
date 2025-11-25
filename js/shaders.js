@@ -399,8 +399,10 @@ export const CLOUD_VERTEX = SNOISE_GLSL + `
     uniform float uPlanetScale;
     uniform float uPlanetHeight;
     uniform float uCloudRotation;
-    uniform float uCloudShrinkAmount; // <--- ADDED
-    uniform float uCloudTransition;   // <--- ADDED
+    uniform float uCloudShrinkAmount;
+    uniform float uCloudTransition;
+    uniform float uCloudSize;           // <--- ADDED
+    uniform float uCloudAltitudeOffset; // <--- ADDED
     
     // Instance Attributes (automatically available when using InstancedMesh)
     // attribute mat4 instanceMatrix; 
@@ -458,7 +460,9 @@ export const CLOUD_VERTEX = SNOISE_GLSL + `
         
         // 4. Apply Shrinking (Towards Cloud Center)
         // We calculate the vertex position in local space (relative to cloudsMesh)
-        vec4 localInstancePos = instanceMatrix * vec4(position, 1.0);
+        // Apply uCloudSize here (scaling local puff)
+        vec3 scaledPos = position * uCloudSize;
+        vec4 localInstancePos = instanceMatrix * vec4(scaledPos, 1.0);
         
         // Calculate vector from cloud center to this vertex
         vec3 offset = localInstancePos.xyz - aCloudCenter;
@@ -466,11 +470,19 @@ export const CLOUD_VERTEX = SNOISE_GLSL + `
         // Scale the offset
         vec3 shrunkPos = aCloudCenter + offset * shrinkFactor;
         
+        // Apply Altitude Offset (Radial displacement)
+        vec3 cloudNormal = normalize(aCloudCenter);
+        shrunkPos += cloudNormal * uCloudAltitudeOffset;
+        
         // 5. Breathing Animation (Optional, apply to shrunkPos)
         float breathe = 1.0 + sin(uTime * 2.0 + aRandom * 6.0) * 0.05;
         // Apply breathing relative to center as well
-        shrunkPos = aCloudCenter + (shrunkPos - aCloudCenter) * breathe;
-
+        // Note: Center has moved if we applied altitude offset? 
+        // Conceptually yes. Let's just apply breathing to the final position relative to the NEW center.
+        // New center = aCloudCenter + cloudNormal * uCloudAltitudeOffset
+        vec3 newCenter = aCloudCenter + cloudNormal * uCloudAltitudeOffset;
+        shrunkPos = newCenter + (shrunkPos - newCenter) * breathe;
+ 
         // 6. Final Position
         vec4 mvPosition = modelViewMatrix * vec4(shrunkPos, 1.0);
         gl_Position = projectionMatrix * mvPosition;

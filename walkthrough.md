@@ -19,10 +19,11 @@
 - Removed the legacy cloud animation loop from `js/main.js`.
 - Simplified the `generateClouds` function to populate the `InstancedMesh` matrix and attributes once.
 
-### 4. Restored GPU-Based Features with Refinements
-We successfully restored the GPU-accelerated cloud and rain system with significant improvements:
-- **Instanced Rendering**: Clouds and rain are now rendered using `THREE.InstancedMesh` for high performance.
-- **Uniform Shrinking**: Implemented a "shrink towards center" logic in the vertex shader. Cloud puffs within a cluster now shrink cohesively towards their shared center (`aCloudCenter`) based on terrain height.
+### 4. Cloud Visuals & Optimization
+- **Parameters**: Added `cloudShrinkAmount`, `cloudTransition`, and `rainDarkness` for fine-tuned control.
+- **Optimization**: Refactored `cloudSize` and `cloudAltitude` to use shader uniforms (`uCloudSize`, `uCloudAltitudeOffset`) instead of regenerating geometry. This allows for smooth, instant adjustments without lag or flickering.
+- **Rain Darkening**: Implemented a decoupled darkening effect that transitions smoothly using a separate `smoothstep` range.
+- **Uniform Shrinking**: Cloud puffs within a cluster now shrink cohesively towards their shared center (`aCloudCenter`) based on terrain height.
 - **Axial Billboarding**: Rain drops are now 2D planes that always face the camera while maintaining a vertical orientation aligned with gravity.
 - **Decoupled Darkening**: The rain darkening effect is now decoupled from the physical shrinking. Clouds begin to darken (turning a stormy blue-grey) *before* they shrink, creating a smoother and more natural transition.
 - **UI Controls**: Added new sliders to the UI to control these effects in real-time:

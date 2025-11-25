@@ -785,6 +785,8 @@ function generatePlanet() {
       uCloudShrinkAmount: { value: PARAMS.cloudShrinkAmount },
       uCloudTransition: { value: PARAMS.cloudTransition },
       uRainDarkness: { value: PARAMS.rainDarkness },
+      uCloudSize: { value: PARAMS.cloudSize }, // <--- ADDED
+      uCloudAltitudeOffset: { value: (PARAMS.cloudAltitude - 1.0) * 1.5 }, // <--- ADDED
     },
     vertexShader: CLOUD_VERTEX,
     fragmentShader: CLOUD_FRAGMENT,
@@ -795,7 +797,8 @@ function generatePlanet() {
 
 
   const minCloudHeight = 4.0 * (1 + PARAMS.height * 0.2) + 0.2;
-  const cloudBaseRadius = minCloudHeight + PARAMS.cloudAltitude * 1.5;
+  // Use fixed base altitude (1.0) so uniform can offset it
+  const cloudBaseRadius = minCloudHeight + 1.0 * 1.5;
   const cloudCount = Math.floor(PARAMS.cloudCoverage);
 
   // --- CLOUD GENERATION (INSTANCED) ---
@@ -878,7 +881,8 @@ function generatePlanet() {
     dummy.rotateZ(cloudRotationZ);
 
     // Scale: Flatten radially (Z in local space after lookAt)
-    const globalScale = PARAMS.cloudSize * (0.8 + Math.random() * 0.4);
+    // Use fixed base scale (1.0) so uniform can multiply it
+    const globalScale = 1.0 * (0.8 + Math.random() * 0.4);
     dummy.scale.set(globalScale, globalScale, globalScale * 0.6);
 
     dummy.updateMatrix();
@@ -1241,6 +1245,8 @@ function updateDependentShaders(key, val) {
       if (key === "cloudShrinkAmount") instancedMesh.material.uniforms.uCloudShrinkAmount.value = val;
       if (key === "cloudTransition") instancedMesh.material.uniforms.uCloudTransition.value = val;
       if (key === "rainDarkness") instancedMesh.material.uniforms.uRainDarkness.value = val;
+      if (key === "cloudSize") instancedMesh.material.uniforms.uCloudSize.value = val; // <--- ADDED
+      if (key === "cloudAltitude") instancedMesh.material.uniforms.uCloudAltitudeOffset.value = (val - 1.0) * 1.5; // <--- ADDED
     }
   }
 
@@ -1373,7 +1379,14 @@ function bindInput(key, element, display, isInt = false) {
         key !== "sunsetTintStrength" &&
         key !== "tintBrightnessDrop" &&
         key !== "sunDistortion" &&
-        key !== "atmoDistortion")
+        key !== "atmoDistortion" &&
+        key !== "cloudSize" &&
+        key !== "cloudAltitude" &&
+        key !== "cloudShrinkAmount" &&
+        key !== "cloudTransition" &&
+        key !== "rainDarkness" &&
+        key !== "cloudHazeMultiplier" &&
+        key !== "cloudLightWrap")
     ) {
       if (key === "starDensity") generateStars();
       else updatePlanet();
