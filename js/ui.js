@@ -5,6 +5,16 @@ export const ui = {
   btnSaveAs: document.getElementById("btn-save-as"),
   btnDelete: document.getElementById("btn-delete"),
   // Modal Elements
+  cloudCoverage: document.getElementById("cloudCoverage"),
+  cloudSize: document.getElementById("cloudSize"),
+  cloudAltitude: document.getElementById("cloudAltitude"),
+
+  // Cloud Controls
+  cShrink: document.getElementById("c-shrink"),
+  cTrans: document.getElementById("c-trans"),
+  rDark: document.getElementById("r-dark"),
+
+  starDensity: document.getElementById("starDensity"),
   modalOverlay: document.getElementById("modal-overlay"),
   modalTitle: document.getElementById("modal-title"),
   modalText: document.getElementById("modal-text"),
@@ -94,6 +104,9 @@ export const displays = {
   cCov: document.getElementById("val-c-cov"),
   cAlt: document.getElementById("val-c-alt"),
   cSize: document.getElementById("val-c-size"),
+  cShrink: document.getElementById("val-c-shrink"), // <--- ADDED
+  cTrans: document.getElementById("val-c-trans"),   // <--- ADDED
+  rDark: document.getElementById("val-r-dark"),     // <--- ADDED
   // New Display
   hStr: document.getElementById("val-h-str"),
   hPow: document.getElementById("val-h-pow"),

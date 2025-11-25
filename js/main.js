@@ -18,10 +18,12 @@ import {
   SUN_FRAGMENT,
   ATMO_VERTEX,
   ATMO_FRAGMENT,
-  CLOUD_VERTEX, // <--- Add this
-  CLOUD_FRAGMENT, // <--- Add this
-  LAVA_VERTEX, // <--- ADD
-  LAVA_FRAGMENT, // <--- ADD
+  CLOUD_VERTEX,
+  CLOUD_FRAGMENT,
+  LAVA_VERTEX,
+  LAVA_FRAGMENT,
+  RAIN_VERTEX,
+  RAIN_FRAGMENT,
 } from "./shaders.js";
 
 // --- STATE MANAGEMENT ---
@@ -776,7 +778,13 @@ function generatePlanet() {
       uHorizonStrength: HORIZON_UNIFORMS.uHorizonStrength,
       uHorizonPower: HORIZON_UNIFORMS.uHorizonPower,
       uCloudHazeMultiplier: CLOUD_UNIFORMS.uCloudHazeMultiplier,
-      uCloudLightWrap: CLOUD_UNIFORMS.uCloudLightWrap, // <--- Add this
+      uCloudLightWrap: CLOUD_UNIFORMS.uCloudLightWrap,
+      uPlanetScale: { value: PARAMS.scale },
+      uPlanetHeight: { value: PARAMS.height },
+      uCloudRotation: { value: 0.0 },
+      uCloudShrinkAmount: { value: PARAMS.cloudShrinkAmount },
+      uCloudTransition: { value: PARAMS.cloudTransition },
+      uRainDarkness: { value: PARAMS.rainDarkness },
     },
     vertexShader: CLOUD_VERTEX,
     fragmentShader: CLOUD_FRAGMENT,
@@ -784,113 +792,236 @@ function generatePlanet() {
     // side: THREE.DoubleSide // Optional: makes them look thicker but might cause artifacts
   });
 
-  // We keep the rain geometry the same
-  const rainGeo = new THREE.BoxGeometry(0.02, 0.6, 0.02);
-  rainGeo.rotateX(Math.PI / 2);
-  const rainMat = new THREE.MeshBasicMaterial({
-    color: 0xaaddff,
-    transparent: true,
-    opacity: 0.4,
-  });
+
 
   const minCloudHeight = 4.0 * (1 + PARAMS.height * 0.2) + 0.2;
   const cloudBaseRadius = minCloudHeight + PARAMS.cloudAltitude * 1.5;
   const cloudCount = Math.floor(PARAMS.cloudCoverage);
 
-  // Geometry for the puffs (Dodecahedron looks slightly softer than Icosahedron at low detail)
+  // --- CLOUD GENERATION (INSTANCED) ---
+  // 1. Calculate Total Count
+  // We estimate average puffs per cloud to pre-allocate
+  const puffsPerCloud = 5; // Average puffs (1 main + ~4 children)
+  const totalInstances = cloudCount * puffsPerCloud;
+
+  // 2. Create InstancedMesh
   const puffGeo = new THREE.DodecahedronGeometry(1, 0);
+  const instancedCloudMesh = new THREE.InstancedMesh(
+    puffGeo,
+    cloudShaderMat,
+    totalInstances,
+  );
+  instancedCloudMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+  instancedCloudMesh.frustumCulled = false; // Prevent culling issues since we don't compute bounding sphere
+
+  // --- RAIN INITIALIZATION ---
+  const dropsPerCloud = 8;
+  const totalRainInstances = cloudCount * dropsPerCloud;
+
+  // Use PlaneGeometry for Billboarding
+  const rainGeo = new THREE.PlaneGeometry(0.05, 0.5);
+  // No rotation needed here, we will handle orientation in shader or via lookAt
+  // Actually, PlaneGeometry faces +Z by default.
+
+  const rainShaderMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0.0 },
+      uPlanetScale: { value: PARAMS.scale },
+      uPlanetHeight: { value: PARAMS.height },
+      uCloudRotation: { value: 0.0 },
+      uCloudTransition: { value: PARAMS.cloudTransition }
+    },
+    vertexShader: RAIN_VERTEX,
+    fragmentShader: RAIN_FRAGMENT,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide // <--- ADDED to prevent culling
+  });
+
+  const instancedRainMesh = new THREE.InstancedMesh(rainGeo, rainShaderMat, totalRainInstances);
+  instancedRainMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+  instancedRainMesh.frustumCulled = false;
+
+  const rainRandoms = new Float32Array(totalRainInstances);
+  const rainSpeeds = new Float32Array(totalRainInstances);
+  const rainCloudCenters = new Float32Array(totalRainInstances * 3); // <--- ADDED
+  let rainIdx = 0;
+
+  // 3. Setup Attributes
+  const dummy = new THREE.Object3D();
+  const randoms = new Float32Array(totalInstances);
+  const cloudCenters = new Float32Array(totalInstances * 3); // <--- ADDED
+  let instanceIdx = 0;
 
   for (let i = 0; i < cloudCount; i++) {
-    const cloud = new THREE.Group();
-
-    // 2. Random Position on Sphere
+    // Cloud Center Position
     const phi = Math.acos(-1 + (2 * i) / cloudCount);
     const theta = Math.sqrt(cloudCount * Math.PI) * phi;
     const phiR = phi + (Math.random() - 0.5) * 0.5;
     const thetaR = theta + (Math.random() - 0.5) * 0.5;
 
-    cloud.position.setFromSphericalCoords(cloudBaseRadius, phiR, thetaR);
-    cloud.lookAt(0, 0, 0); // Z-axis now points at the planet center
+    // Base Rotation for the whole cloud cluster
+    const cloudRotationZ = Math.random() * Math.PI * 2;
 
-    // 3. Create the "Cluster"
+    // --- A. Main Puff ---
+    if (instanceIdx >= totalInstances) break;
 
-    // A. Main Body
-    const mainPuff = new THREE.Mesh(puffGeo, cloudShaderMat);
+    const mainPos = new THREE.Vector3().setFromSphericalCoords(
+      cloudBaseRadius,
+      phiR,
+      thetaR,
+    );
 
-    // FIX 1: Squash the Z-axis (radial), not the Y-axis.
-    // This flattens the cloud against the atmosphere layer.
-    mainPuff.scale.set(1.0, 1.0, 0.6);
+    dummy.position.copy(mainPos);
+    dummy.lookAt(0, 0, 0); // Z points to center
+    // Rotate to align with surface tangent
+    dummy.rotateZ(cloudRotationZ);
 
-    // FIX 2: Rotate mostly around Z (spinning flat on the sky)
-    // Restrict X/Y rotation so it doesn't tilt into the ground
-    mainPuff.rotation.z = Math.random() * Math.PI * 2;
-    mainPuff.rotation.x = (Math.random() - 0.5) * 0.3;
-    mainPuff.rotation.y = (Math.random() - 0.5) * 0.3;
+    // Scale: Flatten radially (Z in local space after lookAt)
+    const globalScale = PARAMS.cloudSize * (0.8 + Math.random() * 0.4);
+    dummy.scale.set(globalScale, globalScale, globalScale * 0.6);
 
-    cloud.add(mainPuff);
+    dummy.updateMatrix();
+    instancedCloudMesh.setMatrixAt(instanceIdx, dummy.matrix);
+    randoms[instanceIdx] = Math.random();
 
-    // B. Child Puffs
+    // Store Center
+    cloudCenters[instanceIdx * 3] = mainPos.x;
+    cloudCenters[instanceIdx * 3 + 1] = mainPos.y;
+    cloudCenters[instanceIdx * 3 + 2] = mainPos.z;
+
+    instanceIdx++;
+
+    // --- B. Child Puffs ---
     const numChildren = 3 + Math.floor(Math.random() * 3);
-    for (let k = 0; k < numChildren; k++) {
-      const child = new THREE.Mesh(puffGeo, cloudShaderMat);
 
-      const dist = 0.6 + Math.random() * 0.6;
+    // We need a local coordinate system for children relative to the main puff
+    // Construct a basis from the main puff's position (Normal)
+    const normal = mainPos.clone().normalize();
+    const up = new THREE.Vector3(0, 1, 0);
+    let tangent = new THREE.Vector3().crossVectors(up, normal).normalize();
+    if (tangent.lengthSq() < 0.001) {
+      tangent = new THREE.Vector3(1, 0, 0); // Handle pole case
+    }
+    const bitangent = new THREE.Vector3().crossVectors(normal, tangent);
+
+    for (let k = 0; k < numChildren; k++) {
+      if (instanceIdx >= totalInstances) break;
+
+      const dist = (0.6 + Math.random() * 0.6) * globalScale; // Scale offset by cloud size
       const angle = Math.random() * Math.PI * 2;
 
-      // FIX 3: Spread children in X and Y (Tangent Plane)
-      // Z is the "height" or "thickness" of the cloud layer
-      child.position.set(
-        Math.cos(angle) * dist, // Spread Horizontal
-        Math.sin(angle) * dist, // Spread Vertical (Tangent)
-        (Math.random() - 0.5) * 0.3, // Thickness (Radial) - Keep thin
-      );
+      // Calculate offset in tangent plane
+      const xOff = Math.cos(angle) * dist;
+      const yOff = Math.sin(angle) * dist;
+      const zOff = (Math.random() - 0.5) * 0.3 * globalScale;
 
-      const scale = 0.4 + Math.random() * 0.4;
-      // Flatten children radially as well
-      child.scale.set(scale, scale, scale * 0.6);
-      child.rotation.z = Math.random() * Math.PI * 2;
+      // Combine to get world position
+      const childPos = mainPos.clone()
+        .add(tangent.clone().multiplyScalar(xOff))
+        .add(bitangent.clone().multiplyScalar(yOff))
+        .add(normal.clone().multiplyScalar(zOff));
 
-      cloud.add(child);
+      dummy.position.copy(childPos);
+      dummy.lookAt(0, 0, 0);
+      dummy.rotateZ(Math.random() * Math.PI * 2); // Random spin
+
+      const childScale = globalScale * (0.4 + Math.random() * 0.4);
+      dummy.scale.set(childScale, childScale, childScale * 0.6);
+
+      dummy.updateMatrix();
+      instancedCloudMesh.setMatrixAt(instanceIdx, dummy.matrix);
+      randoms[instanceIdx] = Math.random();
+
+      // Store Center (Same as main puff for uniform shrinking)
+      cloudCenters[instanceIdx * 3] = mainPos.x;
+      cloudCenters[instanceIdx * 3 + 1] = mainPos.y;
+      cloudCenters[instanceIdx * 3 + 2] = mainPos.z;
+
+      instanceIdx++;
     }
 
-    // 4. Scale the whole cloud based on UI
-    const globalScale = PARAMS.cloudSize * (0.8 + Math.random() * 0.4);
-    cloud.scale.set(globalScale, globalScale, globalScale);
+    // --- C. Rain Drops ---
+    // Generate drops around the cloud center
+    for (let r = 0; r < dropsPerCloud; r++) {
+      if (rainIdx >= totalRainInstances) break;
 
-    // --- RAIN SYSTEM ---
-    const rainGroup = new THREE.Group();
-    const drops = 8;
-    for (let r = 0; r < drops; r++) {
-      const drop = new THREE.Mesh(rainGeo, rainMat);
+      // Random position around cloud center
+      const rainDist = (Math.random() - 0.5) * 1.5 * globalScale;
+      const rainAngle = Math.random() * Math.PI * 2;
 
-      drop.position.set(
-        (Math.random() - 0.5) * 1.5,
-        (Math.random() - 0.5) * 1.5,
-        0.5 + Math.random() * 0.5,
-      );
+      // Offset in tangent plane (similar to children)
+      // We use the same basis vectors (tangent, bitangent, normal) calculated for children
+      // But we want rain to be "under" the cloud? 
+      // Actually, the shader handles the "falling" animation.
+      // We just need to place them in the cloud volume.
 
-      // No rotation needed here because rainGeo is already rotated!
+      const rX = Math.cos(rainAngle) * rainDist;
+      const rY = Math.sin(rainAngle) * rainDist;
+      // LOWER SPAWN POINT:
+      // Cloud is at radius ~4.5. 
+      // We want rain to start "inside" or "below".
+      // Z is radial distance here (along normal).
+      // 0.5 was "above" center? No, normal points OUT.
+      // So +Z is OUT (higher). -Z is IN (lower).
+      // Let's spawn them slightly lower (closer to planet).
+      const rZ = -0.5 + Math.random() * 0.5;
 
-      drop.userData = { speed: 2 + Math.random() * 3 };
-      rainGroup.add(drop);
+      const dropPos = mainPos.clone()
+        .add(tangent.clone().multiplyScalar(rX))
+        .add(bitangent.clone().multiplyScalar(rY))
+        .add(normal.clone().multiplyScalar(rZ)); // Radial offset
+
+      dummy.position.copy(dropPos);
+      dummy.lookAt(0, 0, 0); // Align with planet center
+      // No rotation needed as geometry is rotated
+      dummy.scale.set(1, 1, 1);
+
+      dummy.updateMatrix();
+      instancedRainMesh.setMatrixAt(rainIdx, dummy.matrix);
+      rainRandoms[rainIdx] = Math.random();
+      rainSpeeds[rainIdx] = 2.0 + Math.random() * 3.0;
+
+      // Store Center
+      rainCloudCenters[rainIdx * 3] = mainPos.x;
+      rainCloudCenters[rainIdx * 3 + 1] = mainPos.y;
+      rainCloudCenters[rainIdx * 3 + 2] = mainPos.z;
+
+      rainIdx++;
     }
-
-    rainGroup.visible = false;
-    cloud.add(rainGroup);
-
-    cloud.userData = {
-      rotSpeed: (Math.random() - 0.5) * 0.05,
-      bobSpeed: 1 + Math.random(),
-      bobOffset: Math.random() * Math.PI * 2,
-      baseRadius: cloudBaseRadius,
-      originalScale: globalScale,
-      currentScale: globalScale,
-      rainGroup: rainGroup,
-      material: cloudShaderMat,
-    };
-
-    cloudsMesh.add(cloud);
   }
+
+  // Add Attributes
+  instancedCloudMesh.geometry.setAttribute(
+    "aRandom",
+    new THREE.InstancedBufferAttribute(randoms, 1),
+  );
+  instancedCloudMesh.geometry.setAttribute(
+    "aCloudCenter",
+    new THREE.InstancedBufferAttribute(cloudCenters, 3),
+  );
+
+  // Set actual count used
+  instancedCloudMesh.count = instanceIdx;
+
+  cloudsMesh.add(instancedCloudMesh);
+
+  // Add Rain Attributes
+  instancedRainMesh.geometry.setAttribute(
+    "aRandom",
+    new THREE.InstancedBufferAttribute(rainRandoms, 1),
+  );
+  instancedRainMesh.geometry.setAttribute(
+    "aSpeed",
+    new THREE.InstancedBufferAttribute(rainSpeeds, 1),
+  );
+  instancedRainMesh.geometry.setAttribute(
+    "aCloudCenter",
+    new THREE.InstancedBufferAttribute(rainCloudCenters, 3),
+  );
+  instancedRainMesh.count = rainIdx;
+  cloudsMesh.add(instancedRainMesh);
+
   planetGroup.add(cloudsMesh);
 
   // --- GENERATE LAVA ---
@@ -1100,6 +1231,29 @@ function updateDependentShaders(key, val) {
     if (key === "hazeEnabled")
       mat.uniforms.uHazeIntensity.value = val ? PARAMS.hazeIntensity : 0.0;
   });
+
+  // Update Cloud Uniforms
+  if (cloudsMesh && cloudsMesh.children.length > 0) {
+    const instancedMesh = cloudsMesh.children[0];
+    if (instancedMesh && instancedMesh.material) {
+      if (key === "scale") instancedMesh.material.uniforms.uPlanetScale.value = val;
+      if (key === "height") instancedMesh.material.uniforms.uPlanetHeight.value = val;
+      if (key === "cloudShrinkAmount") instancedMesh.material.uniforms.uCloudShrinkAmount.value = val;
+      if (key === "cloudTransition") instancedMesh.material.uniforms.uCloudTransition.value = val;
+      if (key === "rainDarkness") instancedMesh.material.uniforms.uRainDarkness.value = val;
+    }
+  }
+
+  // Update Rain Uniforms
+  if (cloudsMesh && cloudsMesh.children.length > 1) {
+    // Rain is the second child (index 1)
+    const rainMesh = cloudsMesh.children[1];
+    if (rainMesh && rainMesh.material) {
+      if (key === "scale") rainMesh.material.uniforms.uPlanetScale.value = val;
+      if (key === "height") rainMesh.material.uniforms.uPlanetHeight.value = val;
+      if (key === "cloudTransition") rainMesh.material.uniforms.uCloudTransition.value = val; // Rain needs this too for sync
+    }
+  }
 }
 
 function updateLighting() {
@@ -1145,6 +1299,9 @@ function applyParamsToUI() {
   setVal(ui.cCov, PARAMS.cloudCoverage, displays.cCov);
   setVal(ui.cAlt, PARAMS.cloudAltitude, displays.cAlt);
   setVal(ui.cSize, PARAMS.cloudSize, displays.cSize);
+  setVal(ui.cShrink, PARAMS.cloudShrinkAmount, displays.cShrink); // <--- ADDED
+  setVal(ui.cTrans, PARAMS.cloudTransition, displays.cTrans);     // <--- ADDED
+  setVal(ui.rDark, PARAMS.rainDarkness, displays.rDark);          // <--- ADDED
   setVal(ui.hStr, PARAMS.horizonStrength, displays.hStr);
   setVal(ui.hPow, PARAMS.horizonPower, displays.hPow);
   setVal(ui.chaze, PARAMS.cloudHazeMultiplier, displays.chaze); // <--- Add this
@@ -1265,9 +1422,15 @@ bindInput("sunsetTemp", ui.sunset, null);
 bindInput("sunriseTintStrength", ui.riseTint, displays.riseTint);
 bindInput("sunsetTintStrength", ui.setTint, displays.setTint);
 bindInput("tintBrightnessDrop", ui.tintDim, displays.tintDim);
-bindInput("cloudCoverage", ui.cCov, displays.cCov, true);
+bindInput("cloudCoverage", ui.cCov, displays.cCov);
 bindInput("cloudAltitude", ui.cAlt, displays.cAlt);
 bindInput("cloudSize", ui.cSize, displays.cSize);
+bindInput("cloudShrinkAmount", ui.cShrink, displays.cShrink); // <--- ADDED
+bindInput("cloudTransition", ui.cTrans, displays.cTrans);     // <--- ADDED
+bindInput("rainDarkness", ui.rDark, displays.rDark);          // <--- ADDED
+
+bindInput("horizonStrength", ui.hStr, displays.hStr);
+bindInput("horizonPower", ui.hPow, displays.hPow);
 
 ui.random.addEventListener("click", () => {
   const newSeed = Math.floor(Math.random() * 1000);
@@ -1495,14 +1658,14 @@ function animate() {
     sunMat.uniforms.uSolarEnabled.value = PARAMS.solarEnabled ? 1.0 : 0.0;
     // --- UPDATE CLOUDS WITH SOLAR COLORS ---
     if (cloudsMesh && cloudsMesh.children.length > 0) {
-      const firstCloudMat = cloudsMesh.children[0].children[0].material;
-      if (firstCloudMat.uniforms.uSunColor) {
+      const instancedMesh = cloudsMesh.children[0];
+      if (instancedMesh && instancedMesh.material && instancedMesh.material.uniforms.uSunColor) {
         // 1. Sun Color (Direct Light)
         // Mix White (Day) -> TargetTint (Sunset) based on sunset factor
         // We boost tint saturation slightly for clouds so they catch color early
         let cloudSunColor = new THREE.Color(0xffffff);
         cloudSunColor.lerp(targetTint, sunsetFactor * 1.2);
-        firstCloudMat.uniforms.uSunColor.value.copy(cloudSunColor);
+        instancedMesh.material.uniforms.uSunColor.value.copy(cloudSunColor);
 
         // 2. Ambient Color (Shadow Side)
         // Day: Blue-Grey (0x445566) -> Night: Dark Violet/Black (0x111122)
@@ -1513,7 +1676,7 @@ function animate() {
         // Apply night darkness param
         currentAmb.multiplyScalar(0.5 + (1.0 - PARAMS.nightDarkness) * 0.5);
 
-        firstCloudMat.uniforms.uAmbientColor.value.copy(currentAmb);
+        instancedMesh.material.uniforms.uAmbientColor.value.copy(currentAmb);
       }
     }
   } // End of sunOrbit block
@@ -1524,81 +1687,29 @@ function animate() {
     // --- 1. NEW LOCATION: Update Material Uniforms ONCE per frame ---
     // Since all clouds share the same material, we don't need to do this inside the loop
     if (cloudsMesh.children.length > 0) {
-      // Grab the material from the first cloud's first puff
-      const mat = cloudsMesh.children[0].children[0].material;
-      mat.uniforms.sunPosition.value.copy(sunWorldPos);
-      mat.uniforms.uTime.value = time;
-    }
-
-    cloudsMesh.children.forEach((cloud) => {
-      cloud.rotation.z += cloud.userData.rotSpeed * delta;
-      const bob =
-        Math.sin(time * cloud.userData.bobSpeed + cloud.userData.bobOffset) *
-        0.05;
-      const r = cloud.userData.baseRadius + bob;
-      cloud.position.setLength(r);
-
-      if (currentSimplex) {
-        tempVec.copy(cloud.position).normalize().multiplyScalar(4.0);
-        tempVec.applyAxisAngle(new THREE.Vector3(0, 1, 0), cloudsRotation);
-        const x = tempVec.x;
-        const y = tempVec.y;
-        const z = tempVec.z;
-        const n1 = currentSimplex.noise(
-          x * PARAMS.scale * 0.1,
-          y * PARAMS.scale * 0.1,
-          z * PARAMS.scale * 0.1,
-        );
-        const n2 =
-          currentSimplex.noise(
-            x * PARAMS.scale * 0.3,
-            y * PARAMS.scale * 0.3,
-            z * PARAMS.scale * 0.3,
-          ) * 0.5;
-        const n3 =
-          currentSimplex.noise(
-            x * PARAMS.scale * 1.0,
-            y * PARAMS.scale * 1.0,
-            z * PARAMS.scale * 1.0,
-          ) * 0.2;
-        let noiseVal = Math.max(-0.5, n1 + n2 + n3);
-        const displacement = 1 + noiseVal * PARAMS.height * 0.2;
-        const surfaceH = (displacement * 4 - 4.0) / (PARAMS.height * 0.8);
-
-        // FIX: Use the cloud's stored scale as the default target
-        let targetScale = cloud.userData.originalScale;
-        let raining = false;
-
-        // Optional: If you want clouds to shrink when hitting mountains/rain
-        if (surfaceH > 0.6) {
-          raining = true;
-          targetScale = cloud.userData.originalScale * 0.5; // Shrink relative to size
-        }
-
-        cloud.userData.currentScale = THREE.MathUtils.lerp(
-          cloud.userData.currentScale,
-          targetScale,
-          delta * 0.5,
-        );
-        const s = cloud.userData.currentScale;
-        cloud.scale.set(s, s, s);
-        const rainGroup = cloud.userData.rainGroup;
-        if (rainGroup) {
-          if (raining && s > 0.19) {
-            rainGroup.visible = true;
-            rainGroup.children.forEach((drop) => {
-              drop.position.z += drop.userData.speed * delta * 3.0;
-              if (drop.position.z > 2.5)
-                drop.position.z = -0.1 - Math.random() * 0.2;
-            });
-          } else {
-            rainGroup.visible = false;
-          }
-        }
+      // The first child is now the InstancedMesh
+      const instancedMesh = cloudsMesh.children[0];
+      if (instancedMesh && instancedMesh.material) {
+        instancedMesh.material.uniforms.sunPosition.value.copy(sunWorldPos);
+        instancedMesh.material.uniforms.uTime.value = time;
+        instancedMesh.material.uniforms.uCloudRotation.value = cloudsRotation; // <--- RE-ADDED
       }
 
-      // --- DELETED THE MATERIAL UPDATE BLOCK HERE ---
-    });
+      // Update Rain Time
+      if (cloudsMesh.children.length > 1) {
+        const rainMesh = cloudsMesh.children[1];
+        if (rainMesh && rainMesh.material) {
+          rainMesh.material.uniforms.uTime.value = time;
+          rainMesh.material.uniforms.uCloudRotation.value = cloudsRotation; // <--- RE-ADDED
+        }
+      }
+    }
+
+    // Legacy loop removed. Animation is now handled in Vertex Shader.
+
+
+    // --- DELETED THE MATERIAL UPDATE BLOCK HERE ---
+
   }
 
   if (!isPaused) {

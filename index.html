@@ -1,861 +1,487 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Low Poly Planet - Solar Effects</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <div id="canvas-container"></div>
-    <div id="pause-indicator">PAUSED (Press P)</div>
 
-    <div id="modal-overlay">
-      <div id="modal-box">
-        <h3
-          id="modal-title"
-          class="text-sm font-bold text-white uppercase tracking-wider mb-2"
-        >
-          Message
-        </h3>
-        <p id="modal-text" class="text-xs text-gray-300 mb-4">Content</p>
-        <input
-          type="text"
-          id="modal-input"
-          class="w-full bg-black/50 border border-gray-600 rounded px-2 py-1 text-xs text-white mb-4 outline-none focus:border-blue-500 hidden"
-        />
-        <div class="flex justify-end gap-2">
-          <button
-            id="modal-cancel"
-            class="px-3 py-1 rounded text-xs text-gray-400 hover:bg-white/10 transition"
-          >
-            Cancel
-          </button>
-          <button
-            id="modal-confirm"
-            class="px-3 py-1 rounded text-xs bg-blue-600 text-white hover:bg-blue-500 transition"
-          >
-            OK
-          </button>
-        </div>
-      </div>
-    </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Low Poly Planet - Solar Effects</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
 
-    <button id="ui-toggle" title="Toggle Controls">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-        <circle cx="12" cy="12" r="3" />
-      </svg>
-    </button>
+<body>
+  <div id="canvas-container"></div>
+  <div id="pause-indicator">PAUSED (Press P)</div>
 
-    <div
-      class="absolute top-0 right-0 h-full w-80 glass-panel z-10 p-6 flex flex-col overflow-y-auto transition-transform duration-300 transform translate-x-0"
-      id="ui-panel"
-    >
-      <div class="flex justify-between items-center mb-4">
-        <h1
-          class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-blue-500"
-        >
-          Planet Forge
-        </h1>
-        <button
-          id="randomize-btn"
-          class="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded transition"
-        >
-          Randomize
+  <div id="modal-overlay">
+    <div id="modal-box">
+      <h3 id="modal-title" class="text-sm font-bold text-white uppercase tracking-wider mb-2">
+        Message
+      </h3>
+      <p id="modal-text" class="text-xs text-gray-300 mb-4">Content</p>
+      <input type="text" id="modal-input"
+        class="w-full bg-black/50 border border-gray-600 rounded px-2 py-1 text-xs text-white mb-4 outline-none focus:border-blue-500 hidden" />
+      <div class="flex justify-end gap-2">
+        <button id="modal-cancel" class="px-3 py-1 rounded text-xs text-gray-400 hover:bg-white/10 transition">
+          Cancel
+        </button>
+        <button id="modal-confirm"
+          class="px-3 py-1 rounded text-xs bg-blue-600 text-white hover:bg-blue-500 transition">
+          OK
         </button>
       </div>
+    </div>
+  </div>
 
-      <!-- PRESET MANAGER -->
-      <div class="bg-gray-800/50 p-3 rounded-lg mb-4 border border-gray-700">
-        <div class="flex justify-between items-center mb-2">
-          <label
-            class="text-xs text-gray-400 font-bold uppercase tracking-wider"
-            >Presets</label
-          >
-        </div>
-        <div class="flex gap-2 mb-2">
-          <select
-            id="preset-select"
-            class="w-full bg-black/40 text-xs text-white border border-gray-600 rounded px-2 py-1 outline-none focus:border-blue-500"
-          >
-            <!-- Options populated via JS -->
-          </select>
-        </div>
-        <div class="flex gap-1">
-          <button
-            id="btn-save"
-            class="flex-1 bg-blue-600/40 hover:bg-blue-600/60 text-[10px] py-1 rounded border border-blue-500/30 transition"
-          >
-            Save
-          </button>
-          <button
-            id="btn-save-as"
-            class="flex-1 bg-blue-600/40 hover:bg-blue-600/60 text-[10px] py-1 rounded border border-blue-500/30 transition"
-          >
-            Save As
-          </button>
-          <button
-            id="btn-delete"
-            class="flex-1 bg-red-600/40 hover:bg-red-600/60 text-[10px] py-1 rounded border border-red-500/30 transition"
-          >
-            Delete
-          </button>
-        </div>
+  <button id="ui-toggle" title="Toggle Controls">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  </button>
+
+  <div
+    class="absolute top-0 right-0 h-full w-80 glass-panel z-10 p-6 flex flex-col overflow-y-auto transition-transform duration-300 transform translate-x-0"
+    id="ui-panel">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-blue-500">
+        Planet Forge
+      </h1>
+      <button id="randomize-btn" class="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded transition">
+        Randomize
+      </button>
+    </div>
+
+    <!-- PRESET MANAGER -->
+    <div class="bg-gray-800/50 p-3 rounded-lg mb-4 border border-gray-700">
+      <div class="flex justify-between items-center mb-2">
+        <label class="text-xs text-gray-400 font-bold uppercase tracking-wider">Presets</label>
       </div>
-
-      <div class="space-y-6">
-        <div>
-          <label
-            class="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-2 block"
-            >Biome Preset</label
-          >
-          <div class="grid grid-cols-3 gap-2">
-            <button
-              class="preset-btn bg-green-900/40 border border-green-500/30 hover:bg-green-800/60 text-xs py-1 rounded transition"
-              data-preset="terra"
-            >
-              Terra
-            </button>
-            <button
-              class="preset-btn bg-yellow-900/40 border border-yellow-500/30 hover:bg-yellow-800/60 text-xs py-1 rounded transition"
-              data-preset="desert"
-            >
-              Desert
-            </button>
-            <button
-              class="preset-btn bg-cyan-900/40 border border-cyan-500/30 hover:bg-cyan-800/60 text-xs py-1 rounded transition"
-              data-preset="ice"
-            >
-              Ice
-            </button>
-            <button
-              class="preset-btn bg-purple-900/40 border border-purple-500/30 hover:bg-purple-800/60 text-xs py-1 rounded transition"
-              data-preset="alien"
-            >
-              Alien
-            </button>
-            <button
-              class="preset-btn bg-red-900/40 border border-red-500/30 hover:bg-red-800/60 text-xs py-1 rounded transition"
-              data-preset="molten"
-            >
-              Molten
-            </button>
-            <button
-              class="preset-btn bg-gray-800/40 border border-gray-500/30 hover:bg-gray-700/60 text-xs py-1 rounded transition"
-              data-preset="barren"
-            >
-              Barren
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <div class="flex justify-between mb-1">
-            <label class="text-xs text-gray-300">Seed Offset</label>
-            <span id="val-seed" class="text-xs text-gray-500">0</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="1000"
-            step="1"
-            value="123"
-            class="slider"
-            id="seed"
-          />
-        </div>
-
-        <div>
-          <div class="flex justify-between mb-1">
-            <label class="text-xs text-gray-300">Detail (Resolution)</label>
-            <span id="val-detail" class="text-xs text-gray-500">20</span>
-          </div>
-          <input
-            type="range"
-            min="10"
-            max="60"
-            step="1"
-            value="30"
-            class="slider"
-            id="detail"
-          />
-        </div>
-
-        <div>
-          <div class="flex justify-between mb-1">
-            <label class="text-xs text-gray-300">Roughness</label>
-            <span id="val-scale" class="text-xs text-gray-500">1.5</span>
-          </div>
-          <input
-            type="range"
-            min="0.1"
-            max="5.0"
-            step="0.1"
-            value="1.5"
-            class="slider"
-            id="scale"
-          />
-        </div>
-
-        <div>
-          <div class="flex justify-between mb-1">
-            <label class="text-xs text-gray-300">Relief (Height)</label>
-            <span id="val-height" class="text-xs text-gray-500">1.2</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="3.0"
-            step="0.1"
-            value="1.2"
-            class="slider"
-            id="height"
-          />
-        </div>
-
-        <div class="border-t border-white/10 pt-4 space-y-6">
-          <div>
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-blue-300">Water Level</label>
-              <span id="val-water" class="text-xs text-gray-500">0.2</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="1.5"
-              step="0.05"
-              value="0.2"
-              class="slider"
-              id="water"
-            />
-          </div>
-
-          <!-- New Water Controls -->
-          <div class="bg-blue-900/20 p-3 rounded-lg">
-            <label
-              class="text-xs text-blue-300 font-bold uppercase tracking-wider mb-2 block"
-              >Water Surface</label
-            >
-
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-blue-200">Wave Speed</label>
-              <span id="val-wspeed" class="text-xs text-gray-500">1.0</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="3.0"
-              step="0.1"
-              value="1.0"
-              class="slider"
-              id="wspeed"
-            />
-
-            <div class="flex justify-between mb-1 mt-2">
-              <label class="text-xs text-blue-200">Wave Height</label>
-              <span id="val-wheight" class="text-xs text-gray-500">0.05</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="0.2"
-              step="0.01"
-              value="0.05"
-              class="slider"
-              id="wheight"
-            />
-          </div>
-
-          <div>
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-green-300">Vegetation Density</label>
-              <span id="val-veg" class="text-xs text-gray-500">50</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="200"
-              step="10"
-              value="50"
-              class="slider"
-              id="veg"
-            />
-          </div>
-        </div>
-
-        <div class="border-t border-white/10 pt-4 space-y-4">
-          <label
-            class="text-xs uppercase tracking-wider text-gray-400 font-semibold block"
-            >Atmosphere & Clouds</label
-          >
-
-          <!-- HORIZON FOG CONTROLS -->
-          <div class="bg-white/5 p-3 rounded-lg">
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-pink-300 font-bold"
-                >Horizon Fade (DoF)</label
-              >
-              <span id="val-h-str" class="text-xs text-gray-500">0.15</span>
-            </div>
-            <input
-              type="range"
-              min="0.0"
-              max="1.0"
-              step="0.05"
-              value="0.15"
-              class="slider"
-              id="h-str"
-            />
-
-            <div class="flex justify-between mb-1 mt-2">
-              <label class="text-xs text-pink-200">Fade Falloff</label>
-              <span id="val-h-pow" class="text-xs text-gray-500">7.0</span>
-            </div>
-            <input
-              type="range"
-              min="0.5"
-              max="8.0"
-              step="0.1"
-              value="7.0"
-              class="slider"
-              id="h-pow"
-            />
-          </div>
-
-          <div class="bg-white/5 p-3 rounded-lg mt-2">
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-pink-200">Cloud Haze Multiplier</label>
-              <span id="val-chaze" class="text-xs text-gray-500">1.0</span>
-            </div>
-            <input
-              type="range"
-              min="1.0"
-              max="5.0"
-              step="0.1"
-              value="1.0"
-              class="slider"
-              id="chaze"
-            />
-          </div>
-
-          <div class="bg-white/5 p-3 rounded-lg mt-2">
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-orange-200">Sun Wrap (Falloff)</label>
-              <span id="val-cwrap" class="text-xs text-gray-500">0.6</span>
-            </div>
-            <input
-              type="range"
-              min="-0.5"
-              max="1.0"
-              step="0.05"
-              value="0.6"
-              class="slider"
-              id="cwrap"
-            />
-          </div>
-
-          <!-- SOLAR EFFECTS CONTROLS -->
-          <div class="bg-orange-900/20 p-3 rounded-lg">
-            <div class="flex justify-between items-center mb-2">
-              <label
-                class="text-xs text-orange-300 font-bold uppercase tracking-wider"
-                >Solar Effects</label
-              >
-              <div class="flex items-center space-x-3">
-                <div class="flex items-center space-x-1">
-                  <label class="text-[10px] text-orange-400">Flip</label>
-                  <input
-                    type="checkbox"
-                    id="flip-cycle"
-                    checked
-                    class="accent-orange-500 h-3 w-3 cursor-pointer"
-                  />
-                </div>
-                <div class="flex items-center space-x-1">
-                  <label class="text-[10px] text-green-400">On</label>
-                  <input
-                    type="checkbox"
-                    id="solar-enabled"
-                    checked
-                    class="accent-green-500 h-3 w-3 cursor-pointer"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-orange-200">Sun Distortion</label>
-              <span id="val-sun-dist" class="text-xs text-gray-500">0.005</span>
-            </div>
-            <input
-              type="range"
-              min="0.0"
-              max="0.01"
-              step="0.0001"
-              value="0.005"
-              class="slider"
-              id="sun-dist"
-            />
-
-            <div class="flex justify-between mb-1 mt-2">
-              <label class="text-xs text-orange-200">Haze Distortion</label>
-              <span id="val-atmo-dist" class="text-xs text-gray-500"
-                >0.005</span
-              >
-            </div>
-            <input
-              type="range"
-              min="0.0"
-              max="0.02"
-              step="0.0001"
-              value="0.005"
-              class="slider"
-              id="atmo-dist"
-            />
-
-            <div class="flex justify-between mb-1 mt-2">
-              <label class="text-xs text-orange-200">Color Vibrance</label>
-              <span id="val-vib" class="text-xs text-gray-500">1.2</span>
-            </div>
-            <input
-              type="range"
-              min="0.5"
-              max="2.0"
-              step="0.1"
-              value="1.2"
-              class="slider"
-              id="vib"
-            />
-
-            <!-- Separate Tint Sliders -->
-            <div class="flex justify-between mb-1 mt-2">
-              <label class="text-xs text-yellow-200">Rise Tint Strength</label>
-              <span id="val-risetint" class="text-xs text-gray-500">0.5</span>
-            </div>
-            <input
-              type="range"
-              min="0.0"
-              max="2.0"
-              step="0.1"
-              value="0.5"
-              class="slider"
-              id="risetint"
-            />
-
-            <div class="flex justify-between mb-1 mt-2">
-              <label class="text-xs text-red-200">Set Tint Strength</label>
-              <span id="val-settint" class="text-xs text-gray-500">0.8</span>
-            </div>
-            <input
-              type="range"
-              min="0.0"
-              max="2.0"
-              step="0.1"
-              value="0.8"
-              class="slider"
-              id="settint"
-            />
-
-            <!-- Dimming Control -->
-            <div class="flex justify-between mb-1 mt-2">
-              <label class="text-xs text-gray-300">Tint Dimming</label>
-              <span id="val-tint-dim" class="text-xs text-gray-500">0.5</span>
-            </div>
-            <input
-              type="range"
-              min="0.0"
-              max="1.0"
-              step="0.05"
-              value="0.5"
-              class="slider"
-              id="tint-dim"
-            />
-
-            <!-- New Temp Controls -->
-            <div class="flex justify-between mb-1 mt-2">
-              <label class="text-xs text-blue-300">Sunrise Temp</label>
-              <span class="text-xs text-gray-500">Cold &rarr; Warm</span>
-            </div>
-            <input
-              type="range"
-              min="0.0"
-              max="1.0"
-              step="0.05"
-              value="0.0"
-              class="slider"
-              id="sunrise-temp"
-            />
-
-            <div class="flex justify-between mb-1 mt-2">
-              <label class="text-xs text-red-300">Sunset Temp</label>
-              <span class="text-xs text-gray-500">Orange &rarr; Red</span>
-            </div>
-            <input
-              type="range"
-              min="0.0"
-              max="1.0"
-              step="0.05"
-              value="0.5"
-              class="slider"
-              id="sunset-temp"
-            />
-          </div>
-
-          <div>
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-gray-300">Cloud Coverage</label>
-              <span id="val-c-cov" class="text-xs text-gray-500">20</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="50"
-              step="1"
-              value="20"
-              class="slider"
-              id="c-cov"
-            />
-          </div>
-
-          <div>
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-gray-300">Cloud Altitude</label>
-              <span id="val-c-alt" class="text-xs text-gray-500">1.0</span>
-            </div>
-            <input
-              type="range"
-              min="0.5"
-              max="3.0"
-              step="0.1"
-              value="1.0"
-              class="slider"
-              id="c-alt"
-            />
-          </div>
-
-          <div>
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-gray-300">Cloud Size</label>
-              <span id="val-c-size" class="text-xs text-gray-500">1.0</span>
-            </div>
-            <input
-              type="range"
-              min="0.2"
-              max="2.0"
-              step="0.1"
-              value="1.0"
-              class="slider"
-              id="c-size"
-            />
-          </div>
-
-          <div>
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-blue-200">Atmo Opacity</label>
-              <span id="val-atmo" class="text-xs text-gray-500">0.05</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value="0.05"
-              class="slider"
-              id="atmo"
-            />
-          </div>
-
-          <div>
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-blue-200">Atmo Layers</label>
-              <span id="val-alayers" class="text-xs text-gray-500">5</span>
-            </div>
-            <input
-              type="range"
-              min="1"
-              max="5"
-              step="1"
-              value="5"
-              class="slider"
-              id="alayers"
-            />
-          </div>
-
-          <div>
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-blue-300">Atmo Scale</label>
-              <span id="val-ascale" class="text-xs text-gray-500">1.9</span>
-            </div>
-            <input
-              type="range"
-              min="1.05"
-              max="2.0"
-              step="0.05"
-              value="1.9"
-              class="slider"
-              id="ascale"
-            />
-          </div>
-
-          <div>
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-orange-300">Sunset Offset</label>
-              <span id="val-soff" class="text-xs text-gray-500">0.4</span>
-            </div>
-            <input
-              type="range"
-              min="-0.5"
-              max="0.5"
-              step="0.05"
-              value="0.4"
-              class="slider"
-              id="soff"
-            />
-          </div>
-
-          <div>
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-orange-200">Sunset Width</label>
-              <span id="val-swidth" class="text-xs text-gray-500">0.41</span>
-            </div>
-            <input
-              type="range"
-              min="0.05"
-              max="0.5"
-              step="0.01"
-              value="0.41"
-              class="slider"
-              id="swidth"
-            />
-          </div>
-
-          <div>
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-blue-300">Halo Strength</label>
-              <span id="val-halo" class="text-xs text-gray-500">1.4</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="2.0"
-              step="0.1"
-              value="1.4"
-              class="slider"
-              id="halo"
-            />
-          </div>
-
-          <!-- Haze Controls -->
-          <div class="pt-2 border-t border-white/10">
-            <div class="flex justify-between items-center mb-2">
-              <label
-                class="text-xs text-cyan-200 uppercase font-semibold tracking-wider"
-                >Atmosphere Haze</label
-              >
-              <input
-                type="checkbox"
-                id="hazetoggle"
-                checked
-                class="accent-cyan-500 h-4 w-4 cursor-pointer rounded bg-gray-700 border-transparent focus:ring-0"
-              />
-            </div>
-
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-cyan-200">Haze Spread</label>
-              <span id="val-hspread" class="text-xs text-gray-500">1.0</span>
-            </div>
-            <input
-              type="range"
-              min="0.5"
-              max="8.0"
-              step="0.1"
-              value="1.0"
-              class="slider"
-              id="hspread"
-            />
-
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-cyan-200">Haze Intensity</label>
-              <span id="val-hint" class="text-xs text-gray-500">1.0</span>
-            </div>
-            <input
-              type="range"
-              min="0.0"
-              max="3.0"
-              step="0.1"
-              value="1.0"
-              class="slider"
-              id="hint"
-            />
-
-            <div class="flex justify-between mb-1">
-              <label class="text-xs text-cyan-200">Haze Falloff</label>
-              <span id="val-hfall" class="text-xs text-gray-500">30.0</span>
-            </div>
-            <input
-              type="range"
-              min="0.0"
-              max="30.0"
-              step="0.5"
-              value="30.0"
-              class="slider"
-              id="hfall"
-            />
-          </div>
-        </div>
-
-        <div class="space-y-4 border-t border-white/10 pt-4">
-          <label
-            class="text-xs uppercase tracking-wider text-gray-400 font-semibold block"
-            >System</label
-          >
-          <div class="flex justify-between mb-1">
-            <label class="text-xs text-gray-300">Rotation Speed</label>
-            <span id="val-speed" class="text-xs text-gray-500">0.0</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="2.0"
-            step="0.1"
-            value="0.0"
-            class="slider"
-            id="speed"
-          />
-
-          <div class="flex justify-between mb-1">
-            <label class="text-xs text-gray-300">Cloud Speed</label>
-            <span id="val-cspeed" class="text-xs text-gray-500">0.1</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="1.0"
-            step="0.05"
-            value="0.1"
-            class="slider"
-            id="cspeed"
-          />
-
-          <div class="flex justify-between mb-1">
-            <label class="text-xs text-yellow-300">Day Cycle Speed</label>
-            <span id="val-sun" class="text-xs text-gray-500">0.1</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="1.0"
-            step="0.05"
-            value="0.1"
-            class="slider"
-            id="sun"
-          />
-
-          <div class="flex justify-between mb-1">
-            <label class="text-xs text-purple-300">Night Darkness</label>
-            <span id="val-dark" class="text-xs text-gray-500">0.9</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="1.0"
-            step="0.05"
-            value="0.9"
-            class="slider"
-            id="dark"
-          />
-
-          <div class="flex justify-between mb-1">
-            <label class="text-xs text-red-300">Sun Reddening</label>
-            <span id="val-sred" class="text-xs text-gray-500">0.9</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="2.0"
-            step="0.1"
-            value="0.9"
-            class="slider"
-            id="sred"
-          />
-
-          <div class="flex justify-between mb-1">
-            <label class="text-xs text-yellow-100">Sun Brightness</label>
-            <span id="val-sbright" class="text-xs text-gray-500">3.0</span>
-          </div>
-          <input
-            type="range"
-            min="0.5"
-            max="6.0"
-            step="0.1"
-            value="3.0"
-            class="slider"
-            id="sbright"
-          />
-
-          <div class="flex justify-between mb-1">
-            <label class="text-xs text-white">Star Density</label>
-            <span id="val-stars" class="text-xs text-gray-500">4.5x</span>
-          </div>
-          <input
-            type="range"
-            min="1.0"
-            max="5.0"
-            step="0.5"
-            value="4.5"
-            class="slider"
-            id="stars"
-          />
-        </div>
-
-        <!-- CAMERA CONTROLS -->
-        <div class="border-t border-white/10 pt-4 space-y-2">
-          <label
-            class="text-xs uppercase tracking-wider text-gray-400 font-semibold block"
-            >Camera</label
-          >
-          <div class="flex gap-2">
-            <button
-              id="cam-reset"
-              class="flex-1 bg-white/5 hover:bg-white/10 text-[10px] py-2 rounded border border-white/10 transition text-gray-300 hover:text-white"
-            >
-              Reset View
-            </button>
-            <button
-              id="cam-front"
-              class="flex-1 bg-white/5 hover:bg-white/10 text-[10px] py-2 rounded border border-white/10 transition text-gray-300 hover:text-white"
-            >
-              Front (XY)
-            </button>
-            <button
-              id="cam-top"
-              class="flex-1 bg-white/5 hover:bg-white/10 text-[10px] py-2 rounded border border-white/10 transition text-gray-300 hover:text-white"
-            >
-              Top (XZ)
-            </button>
-          </div>
-        </div>
-
-        <div class="mt-auto pt-6 text-[10px] text-gray-600 text-center">
-          Generated using Three.js & Simplex Noise.<br />
-          Left Click to Orbit • Scroll to Zoom • P to Pause
-        </div>
+      <div class="flex gap-2 mb-2">
+        <select id="preset-select"
+          class="w-full bg-black/40 text-xs text-white border border-gray-600 rounded px-2 py-1 outline-none focus:border-blue-500">
+          <!-- Options populated via JS -->
+        </select>
+      </div>
+      <div class="flex gap-1">
+        <button id="btn-save"
+          class="flex-1 bg-blue-600/40 hover:bg-blue-600/60 text-[10px] py-1 rounded border border-blue-500/30 transition">
+          Save
+        </button>
+        <button id="btn-save-as"
+          class="flex-1 bg-blue-600/40 hover:bg-blue-600/60 text-[10px] py-1 rounded border border-blue-500/30 transition">
+          Save As
+        </button>
+        <button id="btn-delete"
+          class="flex-1 bg-red-600/40 hover:bg-red-600/60 text-[10px] py-1 rounded border border-red-500/30 transition">
+          Delete
+        </button>
       </div>
     </div>
 
-    <script type="importmap">
+    <div class="space-y-6">
+      <div>
+        <label class="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-2 block">Biome Preset</label>
+        <div class="grid grid-cols-3 gap-2">
+          <button
+            class="preset-btn bg-green-900/40 border border-green-500/30 hover:bg-green-800/60 text-xs py-1 rounded transition"
+            data-preset="terra">
+            Terra
+          </button>
+          <button
+            class="preset-btn bg-yellow-900/40 border border-yellow-500/30 hover:bg-yellow-800/60 text-xs py-1 rounded transition"
+            data-preset="desert">
+            Desert
+          </button>
+          <button
+            class="preset-btn bg-cyan-900/40 border border-cyan-500/30 hover:bg-cyan-800/60 text-xs py-1 rounded transition"
+            data-preset="ice">
+            Ice
+          </button>
+          <button
+            class="preset-btn bg-purple-900/40 border border-purple-500/30 hover:bg-purple-800/60 text-xs py-1 rounded transition"
+            data-preset="alien">
+            Alien
+          </button>
+          <button
+            class="preset-btn bg-red-900/40 border border-red-500/30 hover:bg-red-800/60 text-xs py-1 rounded transition"
+            data-preset="molten">
+            Molten
+          </button>
+          <button
+            class="preset-btn bg-gray-800/40 border border-gray-500/30 hover:bg-gray-700/60 text-xs py-1 rounded transition"
+            data-preset="barren">
+            Barren
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex justify-between mb-1">
+          <label class="text-xs text-gray-300">Seed Offset</label>
+          <span id="val-seed" class="text-xs text-gray-500">0</span>
+        </div>
+        <input type="range" min="0" max="1000" step="1" value="123" class="slider" id="seed" />
+      </div>
+
+      <div>
+        <div class="flex justify-between mb-1">
+          <label class="text-xs text-gray-300">Detail (Resolution)</label>
+          <span id="val-detail" class="text-xs text-gray-500">20</span>
+        </div>
+        <input type="range" min="10" max="60" step="1" value="30" class="slider" id="detail" />
+      </div>
+
+      <div>
+        <div class="flex justify-between mb-1">
+          <label class="text-xs text-gray-300">Roughness</label>
+          <span id="val-scale" class="text-xs text-gray-500">1.5</span>
+        </div>
+        <input type="range" min="0.1" max="5.0" step="0.1" value="1.5" class="slider" id="scale" />
+      </div>
+
+      <div>
+        <div class="flex justify-between mb-1">
+          <label class="text-xs text-gray-300">Relief (Height)</label>
+          <span id="val-height" class="text-xs text-gray-500">1.2</span>
+        </div>
+        <input type="range" min="0" max="3.0" step="0.1" value="1.2" class="slider" id="height" />
+      </div>
+
+      <div class="border-t border-white/10 pt-4 space-y-6">
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-blue-300">Water Level</label>
+            <span id="val-water" class="text-xs text-gray-500">0.2</span>
+          </div>
+          <input type="range" min="0" max="1.5" step="0.05" value="0.2" class="slider" id="water" />
+        </div>
+
+        <!-- New Water Controls -->
+        <div class="bg-blue-900/20 p-3 rounded-lg">
+          <label class="text-xs text-blue-300 font-bold uppercase tracking-wider mb-2 block">Water Surface</label>
+
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-blue-200">Wave Speed</label>
+            <span id="val-wspeed" class="text-xs text-gray-500">1.0</span>
+          </div>
+          <input type="range" min="0" max="3.0" step="0.1" value="1.0" class="slider" id="wspeed" />
+
+          <div class="flex justify-between mb-1 mt-2">
+            <label class="text-xs text-blue-200">Wave Height</label>
+            <span id="val-wheight" class="text-xs text-gray-500">0.05</span>
+          </div>
+          <input type="range" min="0" max="0.2" step="0.01" value="0.05" class="slider" id="wheight" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-green-300">Vegetation Density</label>
+            <span id="val-veg" class="text-xs text-gray-500">50</span>
+          </div>
+          <input type="range" min="0" max="200" step="10" value="50" class="slider" id="veg" />
+        </div>
+      </div>
+
+      <div class="border-t border-white/10 pt-4 space-y-4">
+        <label class="text-xs uppercase tracking-wider text-gray-400 font-semibold block">Atmosphere & Clouds</label>
+
+        <!-- HORIZON FOG CONTROLS -->
+        <div class="bg-white/5 p-3 rounded-lg">
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-pink-300 font-bold">Horizon Fade (DoF)</label>
+            <span id="val-h-str" class="text-xs text-gray-500">0.15</span>
+          </div>
+          <input type="range" min="0.0" max="1.0" step="0.05" value="0.15" class="slider" id="h-str" />
+
+          <div class="flex justify-between mb-1 mt-2">
+            <label class="text-xs text-pink-200">Fade Falloff</label>
+            <span id="val-h-pow" class="text-xs text-gray-500">7.0</span>
+          </div>
+          <input type="range" min="0.5" max="8.0" step="0.1" value="7.0" class="slider" id="h-pow" />
+        </div>
+
+        <div class="bg-white/5 p-3 rounded-lg mt-2">
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-pink-200">Cloud Haze Multiplier</label>
+            <span id="val-chaze" class="text-xs text-gray-500">1.0</span>
+          </div>
+          <input type="range" min="1.0" max="5.0" step="0.1" value="1.0" class="slider" id="chaze" />
+        </div>
+
+        <div class="bg-white/5 p-3 rounded-lg mt-2">
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-orange-200">Sun Wrap (Falloff)</label>
+            <span id="val-cwrap" class="text-xs text-gray-500">0.6</span>
+          </div>
+          <input type="range" min="-0.5" max="1.0" step="0.05" value="0.6" class="slider" id="cwrap" />
+        </div>
+
+        <!-- SOLAR EFFECTS CONTROLS -->
+        <div class="bg-orange-900/20 p-3 rounded-lg">
+          <div class="flex justify-between items-center mb-2">
+            <label class="text-xs text-orange-300 font-bold uppercase tracking-wider">Solar Effects</label>
+            <div class="flex items-center space-x-3">
+              <div class="flex items-center space-x-1">
+                <label class="text-[10px] text-orange-400">Flip</label>
+                <input type="checkbox" id="flip-cycle" checked class="accent-orange-500 h-3 w-3 cursor-pointer" />
+              </div>
+              <div class="flex items-center space-x-1">
+                <label class="text-[10px] text-green-400">On</label>
+                <input type="checkbox" id="solar-enabled" checked class="accent-green-500 h-3 w-3 cursor-pointer" />
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-orange-200">Sun Distortion</label>
+            <span id="val-sun-dist" class="text-xs text-gray-500">0.005</span>
+          </div>
+          <input type="range" min="0.0" max="0.01" step="0.0001" value="0.005" class="slider" id="sun-dist" />
+
+          <div class="flex justify-between mb-1 mt-2">
+            <label class="text-xs text-orange-200">Haze Distortion</label>
+            <span id="val-atmo-dist" class="text-xs text-gray-500">0.005</span>
+          </div>
+          <input type="range" min="0.0" max="0.02" step="0.0001" value="0.005" class="slider" id="atmo-dist" />
+
+          <div class="flex justify-between mb-1 mt-2">
+            <label class="text-xs text-orange-200">Color Vibrance</label>
+            <span id="val-vib" class="text-xs text-gray-500">1.2</span>
+          </div>
+          <input type="range" min="0.5" max="2.0" step="0.1" value="1.2" class="slider" id="vib" />
+
+          <!-- Separate Tint Sliders -->
+          <div class="flex justify-between mb-1 mt-2">
+            <label class="text-xs text-yellow-200">Rise Tint Strength</label>
+            <span id="val-risetint" class="text-xs text-gray-500">0.5</span>
+          </div>
+          <input type="range" min="0.0" max="2.0" step="0.1" value="0.5" class="slider" id="risetint" />
+
+          <div class="flex justify-between mb-1 mt-2">
+            <label class="text-xs text-red-200">Set Tint Strength</label>
+            <span id="val-settint" class="text-xs text-gray-500">0.8</span>
+          </div>
+          <input type="range" min="0.0" max="2.0" step="0.1" value="0.8" class="slider" id="settint" />
+
+          <!-- Dimming Control -->
+          <div class="flex justify-between mb-1 mt-2">
+            <label class="text-xs text-gray-300">Tint Dimming</label>
+            <span id="val-tint-dim" class="text-xs text-gray-500">0.5</span>
+          </div>
+          <input type="range" min="0.0" max="1.0" step="0.05" value="0.5" class="slider" id="tint-dim" />
+
+          <!-- New Temp Controls -->
+          <div class="flex justify-between mb-1 mt-2">
+            <label class="text-xs text-blue-300">Sunrise Temp</label>
+            <span class="text-xs text-gray-500">Cold &rarr; Warm</span>
+          </div>
+          <input type="range" min="0.0" max="1.0" step="0.05" value="0.0" class="slider" id="sunrise-temp" />
+
+          <div class="flex justify-between mb-1 mt-2">
+            <label class="text-xs text-red-300">Sunset Temp</label>
+            <span class="text-xs text-gray-500">Orange &rarr; Red</span>
+          </div>
+          <input type="range" min="0.0" max="1.0" step="0.05" value="0.5" class="slider" id="sunset-temp" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-gray-300">Cloud Coverage</label>
+            <span id="val-c-cov" class="text-xs text-gray-500">20</span>
+          </div>
+          <input type="range" min="0" max="50" step="1" value="20" class="slider" id="c-cov" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-gray-300">Cloud Altitude</label>
+            <span id="val-c-alt" class="text-xs text-gray-500">1.0</span>
+          </div>
+          <input type="range" min="0.5" max="3.0" step="0.1" value="1.0" class="slider" id="c-alt" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-gray-300">Cloud Size</label>
+            <span id="val-c-size" class="text-xs text-gray-500">1.0</span>
+          </div>
+          <input type="range" min="0.2" max="2.0" step="0.1" value="1.0" class="slider" id="c-size" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-gray-300">Shrink Amount</label>
+            <span id="val-c-shrink" class="text-xs text-gray-500">0.5</span>
+          </div>
+          <input type="range" min="0.0" max="1.0" step="0.05" value="0.5" class="slider" id="c-shrink" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-gray-300">Transition</label>
+            <span id="val-c-trans" class="text-xs text-gray-500">0.6</span>
+          </div>
+          <input type="range" min="0.1" max="2.0" step="0.1" value="0.6" class="slider" id="c-trans" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-blue-300">Rain Darkness</label>
+            <span id="val-r-dark" class="text-xs text-gray-500">0.5</span>
+          </div>
+          <input type="range" min="0.0" max="1.0" step="0.05" value="0.5" class="slider" id="r-dark" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-blue-200">Atmo Opacity</label>
+            <span id="val-atmo" class="text-xs text-gray-500">0.05</span>
+          </div>
+          <input type="range" min="0" max="1" step="0.05" value="0.05" class="slider" id="atmo" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-blue-200">Atmo Layers</label>
+            <span id="val-alayers" class="text-xs text-gray-500">5</span>
+          </div>
+          <input type="range" min="1" max="5" step="1" value="5" class="slider" id="alayers" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-blue-300">Atmo Scale</label>
+            <span id="val-ascale" class="text-xs text-gray-500">1.9</span>
+          </div>
+          <input type="range" min="1.05" max="2.0" step="0.05" value="1.9" class="slider" id="ascale" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-orange-300">Sunset Offset</label>
+            <span id="val-soff" class="text-xs text-gray-500">0.4</span>
+          </div>
+          <input type="range" min="-0.5" max="0.5" step="0.05" value="0.4" class="slider" id="soff" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-orange-200">Sunset Width</label>
+            <span id="val-swidth" class="text-xs text-gray-500">0.41</span>
+          </div>
+          <input type="range" min="0.05" max="0.5" step="0.01" value="0.41" class="slider" id="swidth" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-blue-300">Halo Strength</label>
+            <span id="val-halo" class="text-xs text-gray-500">1.4</span>
+          </div>
+          <input type="range" min="0" max="2.0" step="0.1" value="1.4" class="slider" id="halo" />
+        </div>
+
+        <!-- Haze Controls -->
+        <div class="pt-2 border-t border-white/10">
+          <div class="flex justify-between items-center mb-2">
+            <label class="text-xs text-cyan-200 uppercase font-semibold tracking-wider">Atmosphere Haze</label>
+            <input type="checkbox" id="hazetoggle" checked
+              class="accent-cyan-500 h-4 w-4 cursor-pointer rounded bg-gray-700 border-transparent focus:ring-0" />
+          </div>
+
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-cyan-200">Haze Spread</label>
+            <span id="val-hspread" class="text-xs text-gray-500">1.0</span>
+          </div>
+          <input type="range" min="0.5" max="8.0" step="0.1" value="1.0" class="slider" id="hspread" />
+
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-cyan-200">Haze Intensity</label>
+            <span id="val-hint" class="text-xs text-gray-500">1.0</span>
+          </div>
+          <input type="range" min="0.0" max="3.0" step="0.1" value="1.0" class="slider" id="hint" />
+
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-cyan-200">Haze Falloff</label>
+            <span id="val-hfall" class="text-xs text-gray-500">30.0</span>
+          </div>
+          <input type="range" min="0.0" max="30.0" step="0.5" value="30.0" class="slider" id="hfall" />
+        </div>
+      </div>
+
+      <div class="space-y-4 border-t border-white/10 pt-4">
+        <label class="text-xs uppercase tracking-wider text-gray-400 font-semibold block">System</label>
+        <div class="flex justify-between mb-1">
+          <label class="text-xs text-gray-300">Rotation Speed</label>
+          <span id="val-speed" class="text-xs text-gray-500">0.0</span>
+        </div>
+        <input type="range" min="0" max="2.0" step="0.1" value="0.0" class="slider" id="speed" />
+
+        <div class="flex justify-between mb-1">
+          <label class="text-xs text-gray-300">Cloud Speed</label>
+          <span id="val-cspeed" class="text-xs text-gray-500">0.1</span>
+        </div>
+        <input type="range" min="0" max="1.0" step="0.05" value="0.1" class="slider" id="cspeed" />
+
+        <div class="flex justify-between mb-1">
+          <label class="text-xs text-yellow-300">Day Cycle Speed</label>
+          <span id="val-sun" class="text-xs text-gray-500">0.1</span>
+        </div>
+        <input type="range" min="0" max="1.0" step="0.05" value="0.1" class="slider" id="sun" />
+
+        <div class="flex justify-between mb-1">
+          <label class="text-xs text-purple-300">Night Darkness</label>
+          <span id="val-dark" class="text-xs text-gray-500">0.9</span>
+        </div>
+        <input type="range" min="0" max="1.0" step="0.05" value="0.9" class="slider" id="dark" />
+
+        <div class="flex justify-between mb-1">
+          <label class="text-xs text-red-300">Sun Reddening</label>
+          <span id="val-sred" class="text-xs text-gray-500">0.9</span>
+        </div>
+        <input type="range" min="0" max="2.0" step="0.1" value="0.9" class="slider" id="sred" />
+
+        <div class="flex justify-between mb-1">
+          <label class="text-xs text-yellow-100">Sun Brightness</label>
+          <span id="val-sbright" class="text-xs text-gray-500">3.0</span>
+        </div>
+        <input type="range" min="0.5" max="6.0" step="0.1" value="3.0" class="slider" id="sbright" />
+
+        <div class="flex justify-between mb-1">
+          <label class="text-xs text-white">Star Density</label>
+          <span id="val-stars" class="text-xs text-gray-500">4.5x</span>
+        </div>
+        <input type="range" min="1.0" max="5.0" step="0.5" value="4.5" class="slider" id="stars" />
+      </div>
+
+      <!-- CAMERA CONTROLS -->
+      <div class="border-t border-white/10 pt-4 space-y-2">
+        <label class="text-xs uppercase tracking-wider text-gray-400 font-semibold block">Camera</label>
+        <div class="flex gap-2">
+          <button id="cam-reset"
+            class="flex-1 bg-white/5 hover:bg-white/10 text-[10px] py-2 rounded border border-white/10 transition text-gray-300 hover:text-white">
+            Reset View
+          </button>
+          <button id="cam-front"
+            class="flex-1 bg-white/5 hover:bg-white/10 text-[10px] py-2 rounded border border-white/10 transition text-gray-300 hover:text-white">
+            Front (XY)
+          </button>
+          <button id="cam-top"
+            class="flex-1 bg-white/5 hover:bg-white/10 text-[10px] py-2 rounded border border-white/10 transition text-gray-300 hover:text-white">
+            Top (XZ)
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-auto pt-6 text-[10px] text-gray-600 text-center">
+        Generated using Three.js & Simplex Noise.<br />
+        Left Click to Orbit • Scroll to Zoom • P to Pause
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
       {
         "imports": {
           "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -864,6 +490,7 @@
       }
     </script>
 
-    <script type="module" src="./js/main.js"></script>
-  </body>
+  <script type="module" src="./js/main.js"></script>
+</body>
+
 </html>

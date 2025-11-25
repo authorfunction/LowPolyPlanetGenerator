@@ -142,6 +142,11 @@ export const DEFAULT_PARAMS = {
   cloudCoverage: 13,
   cloudAltitude: 0.9,
   cloudSize: 1.2,
+  cloudShrinkAmount: 0.3,  // 0.0 to 1.0
+  cloudTransition: 1.9,    // 0.1 to 1.0
+  rainDarkness: 0.85,      // 0.0 to 1.0
+
+  // Stars
   vegetationDensity: 80,
   starDensity: 5,
   horizonStrength: 0.1,

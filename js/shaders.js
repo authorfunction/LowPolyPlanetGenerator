@@ -284,26 +284,305 @@ export const ATMO_FRAGMENT = `
 
 // --- CLOUD SHADERS ---
 
-export const CLOUD_VERTEX = `
+// --- SIMPLEX NOISE GLSL ---
+// Description : Array and textureless GLSL 2D/3D/4D Simplex Noise functions.
+//      Author : Ian McEwan, Ashima Arts.
+//  Maintainer : stegu
+//     Lastmod : 20110822 (ijm)
+//     License : Copyright (C) 2011 Ashima Arts. All rights reserved.
+//               Distributed under the MIT License. See LICENSE file.
+//               https://github.com/ashima/webgl-noise
+//
+
+const SNOISE_GLSL = `
+vec3 mod289(vec3 x) {
+  return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+
+vec4 mod289(vec4 x) {
+  return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+
+vec4 permute(vec4 x) {
+     return mod289(((x*34.0)+1.0)*x);
+}
+
+vec4 taylorInvSqrt(vec4 r)
+{
+  return 1.79284291400159 - 0.85373472095314 * r;
+}
+
+float snoise(vec3 v)
+{
+  const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
+  const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
+
+// First corner
+  vec3 i  = floor(v + dot(v, C.yyy) );
+  vec3 x0 = v - i + dot(i, C.xxx) ;
+
+// Other corners
+  vec3 g = step(x0.yzx, x0.xyz);
+  vec3 l = 1.0 - g;
+  vec3 i1 = min( g.xyz, l.zxy );
+  vec3 i2 = max( g.xyz, l.zxy );
+
+  //   x0 = x0 - 0.0 + 0.0 * C.xxx;
+  //   x1 = x0 - i1  + 1.0 * C.xxx;
+  //   x2 = x0 - i2  + 2.0 * C.xxx;
+  //   x3 = x0 - 1.0 + 3.0 * C.xxx;
+  vec3 x1 = x0 - i1 + C.xxx;
+  vec3 x2 = x0 - i2 + C.yyy; // 2.0*C.x = 1/3 = C.y
+  vec3 x3 = x0 - D.yyy;      // -1.0+3.0*C.x = -0.5 = -D.y
+
+// Permutations
+  i = mod289(i);
+  vec4 p = permute( permute( permute(
+             i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
+           + i.y + vec4(0.0, i1.y, i2.y, 1.0 ))
+           + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
+
+// Gradients: 7x7 points over a square, mapped onto an octahedron.
+// The ring size 17*17 = 289 is close to a multiple of 49 (49*6 = 294)
+  float n_ = 0.142857142857; // 1.0/7.0
+  vec3  ns = n_ * D.wyz - D.xzx;
+
+  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);  //  mod(p,7*7)
+
+  vec4 x_ = floor(j * ns.z);
+  vec4 y_ = floor(j - 7.0 * x_ );    // mod(j,N)
+
+  vec4 x = x_ *ns.x + ns.yyyy;
+  vec4 y = y_ *ns.x + ns.yyyy;
+  vec4 h = 1.0 - abs(x) - abs(y);
+
+  vec4 b0 = vec4( x.xy, y.xy );
+  vec4 b1 = vec4( x.zw, y.zw );
+
+  //vec4 s0 = vec4(lessThan(b0,0.0))*2.0 - 1.0;
+  //vec4 s1 = vec4(lessThan(b1,0.0))*2.0 - 1.0;
+  vec4 s0 = floor(b0)*2.0 + 1.0;
+  vec4 s1 = floor(b1)*2.0 + 1.0;
+
+  vec4 sh = -step(h, vec4(0.0));
+
+  vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
+  vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
+
+  vec3 p0 = vec3(a0.xy,h.x);
+  vec3 p1 = vec3(a0.zw,h.y);
+  vec3 p2 = vec3(a1.xy,h.z);
+  vec3 p3 = vec3(a1.zw,h.w);
+
+//Normalise gradients
+  vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+  p0 *= norm.x;
+  p1 *= norm.y;
+  p2 *= norm.z;
+  p3 *= norm.w;
+
+// Mix final noise value
+  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+  m = m * m;
+  return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1),
+                                dot(p2,x2), dot(p3,x3) ) );
+}
+`;
+
+export const CLOUD_VERTEX = SNOISE_GLSL + `
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vViewPosition;
     varying vec3 vWorldPosition;
 
     uniform float uTime;
+    uniform float uPlanetScale;
+    uniform float uPlanetHeight;
+    uniform float uCloudRotation;
+    uniform float uCloudShrinkAmount; // <--- ADDED
+    uniform float uCloudTransition;   // <--- ADDED
+    
+    // Instance Attributes (automatically available when using InstancedMesh)
+    // attribute mat4 instanceMatrix; 
+    
+    // Custom Instance Attributes
+    attribute float aRandom; // For offset/phase
+    attribute vec3 aCloudCenter;
+    
+    varying float vRainFactor; // <--- ADDED to pass to fragment
 
     void main() {
         vUv = uv;
-        vNormal = normalize(normalMatrix * normal);
-        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-        vViewPosition = -mvPosition.xyz;
+        
+        // 1. Calculate Planet Local Position of Cloud Center for Noise
+        float c = cos(uCloudRotation);
+        float s = sin(uCloudRotation);
+        mat3 rotY = mat3(
+            c, 0.0, s,
+            0.0, 1.0, 0.0,
+            -s, 0.0, c
+        );
+        vec3 noisePos = rotY * aCloudCenter;
+        vec3 dir = normalize(noisePos);
+        
+        // 2. Calculate Noise
+        vec3 p = dir * 4.0;
+        
+        float n1 = snoise(p * uPlanetScale * 0.1);
+        float n2 = snoise(p * uPlanetScale * 0.3) * 0.5;
+        float n3 = snoise(p * uPlanetScale * 1.0) * 0.2;
+        
+        float noiseVal = max(-0.5, n1 + n2 + n3);
+        float displacement = 1.0 + noiseVal * uPlanetHeight * 0.2;
+        float surfaceH = (displacement * 4.0 - 4.0) / (uPlanetHeight * 0.8);
+        
+        // 3. Calculate Shrink Factor
+        // Use uCloudTransition for smoothstep width
+        float halfWidth = uCloudTransition * 0.5;
+        float tMin = 0.6 - halfWidth;
+        float tMax = 0.6 + halfWidth;
+        
+        // Shrink Factor (Physical size change)
+        float shrinkT = smoothstep(tMin, tMax, surfaceH);
+        
+        // Rain/Darkness Factor (Visual color change)
+        // Decouple: Make it smoother/wider than the shrinking
+        // Start darkening earlier (tMin - 0.4) and finish later (tMax + 0.4)
+        float rainT = smoothstep(tMin - 0.4, tMax + 0.4, surfaceH);
+        
+        vRainFactor = rainT; // Pass to fragment for darkening
+        
+        // Shrink based on uCloudShrinkAmount
+        float targetScale = 1.0 - uCloudShrinkAmount;
+        float shrinkFactor = mix(1.0, targetScale, shrinkT);
+        
+        // 4. Apply Shrinking (Towards Cloud Center)
+        // We calculate the vertex position in local space (relative to cloudsMesh)
+        vec4 localInstancePos = instanceMatrix * vec4(position, 1.0);
+        
+        // Calculate vector from cloud center to this vertex
+        vec3 offset = localInstancePos.xyz - aCloudCenter;
+        
+        // Scale the offset
+        vec3 shrunkPos = aCloudCenter + offset * shrinkFactor;
+        
+        // 5. Breathing Animation (Optional, apply to shrunkPos)
+        float breathe = 1.0 + sin(uTime * 2.0 + aRandom * 6.0) * 0.05;
+        // Apply breathing relative to center as well
+        shrunkPos = aCloudCenter + (shrunkPos - aCloudCenter) * breathe;
 
-        // Calculate world position for height-based logic if needed
-        vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
-
+        // 6. Final Position
+        vec4 mvPosition = modelViewMatrix * vec4(shrunkPos, 1.0);
         gl_Position = projectionMatrix * mvPosition;
+        
+        vViewPosition = -mvPosition.xyz;
+        vWorldPosition = (modelMatrix * vec4(shrunkPos, 1.0)).xyz;
+
+        // Normal needs to be transformed by the instance rotation
+        vec3 transformedNormal = mat3(instanceMatrix) * normal;
+        vNormal = normalize(normalMatrix * transformedNormal);
     }
 `;
+
+export const RAIN_VERTEX = SNOISE_GLSL + `
+    varying vec2 vUv;
+    uniform float uTime;
+    uniform float uPlanetScale;
+    uniform float uPlanetHeight;
+    uniform float uCloudRotation;
+    uniform float uCloudTransition; // <--- ADDED
+    
+    attribute float aSpeed;
+    attribute float aRandom;
+    attribute vec3 aCloudCenter;
+
+    void main() {
+        vUv = uv;
+        
+        // 1. Calculate World Position of Drop Center
+        // We start at the instance origin (0,0,0 local)
+        vec4 instancePos = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0); 
+        vec3 worldPos = (modelMatrix * instancePos).xyz;
+        
+        // 2. Check Terrain (using Cloud Center in Planet Local Space)
+        float c = cos(uCloudRotation);
+        float s = sin(uCloudRotation);
+        mat3 rotY = mat3(
+            c, 0.0, s,
+            0.0, 1.0, 0.0,
+            -s, 0.0, c
+        );
+        vec3 noisePos = rotY * aCloudCenter;
+        vec3 dir = normalize(noisePos);
+        vec3 p = dir * 4.0;
+        
+        float n1 = snoise(p * uPlanetScale * 0.1);
+        float n2 = snoise(p * uPlanetScale * 0.3) * 0.5;
+        float n3 = snoise(p * uPlanetScale * 1.0) * 0.2;
+        float noiseVal = max(-0.5, n1 + n2 + n3);
+        float displacement = 1.0 + noiseVal * uPlanetHeight * 0.2;
+        float surfaceH = (displacement * 4.0 - 4.0) / (uPlanetHeight * 0.8);
+        
+        // 3. Visibility Logic
+        // Match Cloud Transition
+        float halfWidth = uCloudTransition * 0.5;
+        float tMin = 0.6 - halfWidth;
+        float tMax = 0.6 + halfWidth;
+        
+        float rainFactor = smoothstep(tMin, tMax, surfaceH);
+        
+        if (rainFactor <= 0.01) {
+            gl_Position = vec4(0.0);
+            return;
+        }
+        
+        // 4. Animation (Falling)
+        float fallSpeed = aSpeed * 3.0;
+        float fallOffset = mod(uTime * fallSpeed + aRandom * 10.0, 2.5);
+        
+        // Move towards planet center (Radial Inward)
+        vec3 dropUp = normalize(worldPos); // Points AWAY from planet center
+        vec3 animatedWorldPos = worldPos - dropUp * fallOffset;
+        
+        // 5. AXIAL BILLBOARDING
+        // We want the drop to point along 'dropUp' (or -dropUp)
+        // And face the camera.
+        
+        vec3 viewDir = normalize(cameraPosition - animatedWorldPos);
+        
+        // Ensure viewDir and dropUp are not parallel
+        // If they are, cross product is zero.
+        // This happens if looking straight down at the drop.
+        // Fallback: use a default right vector.
+        vec3 right = cross(viewDir, dropUp);
+        if (length(right) < 0.001) {
+            right = vec3(1.0, 0.0, 0.0);
+        } else {
+            right = normalize(right);
+        }
+        
+        // Construct the vertex position
+        // position.x is width, position.y is height
+        float scale = rainFactor;
+        
+        // Note: PlaneGeometry is XY plane.
+        // We map X to 'right' and Y to 'dropUp'.
+        
+        vec3 finalPos = animatedWorldPos 
+            + right * position.x * scale 
+            + dropUp * position.y * scale;
+            
+        gl_Position = projectionMatrix * viewMatrix * vec4(finalPos, 1.0);
+    }
+`;
+
+export const RAIN_FRAGMENT = `
+    varying vec2 vUv;
+    void main() {
+        gl_FragColor = vec4(0.6, 0.8, 1.0, 0.6); // Light Blue
+    }
+`;
+
 
 export const CLOUD_FRAGMENT = `
     uniform vec3 uBaseColor;
@@ -318,10 +597,12 @@ export const CLOUD_FRAGMENT = `
     uniform float uHorizonPower;
     uniform float uCloudHazeMultiplier;
     uniform float uCloudLightWrap;
+    uniform float uRainDarkness; // <--- ADDED
 
     varying vec3 vNormal;
     varying vec3 vViewPosition;
     varying vec3 vWorldPosition;
+    varying float vRainFactor; // <--- ADDED
 
     void main() {
         vec3 normal = normalize(vNormal);
@@ -368,6 +649,16 @@ export const CLOUD_FRAGMENT = `
 
         // Combine
         vec3 finalColor = bodyColor + finalRim + scatterColor;
+        
+        // --- Rain Darkening ---
+        // Use a fixed dark storm color for maximum contrast
+        vec3 stormColor = vec3(0.05, 0.05, 0.1); 
+        
+        // Mix based on rain factor and user setting
+        // We boost the factor slightly to ensure it hits full darkness
+        float mixFactor = clamp(vRainFactor * uRainDarkness * 1.5, 0.0, 1.0);
+        
+        finalColor = mix(finalColor, stormColor, mixFactor);
 
         // --- 5. Atmospheric Haze ---
         vec3 hNormal = normalize(vWorldPosition);
