@@ -80,76 +80,90 @@
       </div>
     </div>
 
-    <div class="space-y-6">
-      <div>
-        <label class="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-2 block">Biome Preset</label>
-        <div class="grid grid-cols-3 gap-2">
-          <button
-            class="preset-btn bg-green-900/40 border border-green-500/30 hover:bg-green-800/60 text-xs py-1 rounded transition"
-            data-preset="terra">
-            Terra
-          </button>
-          <button
-            class="preset-btn bg-yellow-900/40 border border-yellow-500/30 hover:bg-yellow-800/60 text-xs py-1 rounded transition"
-            data-preset="desert">
-            Desert
-          </button>
-          <button
-            class="preset-btn bg-cyan-900/40 border border-cyan-500/30 hover:bg-cyan-800/60 text-xs py-1 rounded transition"
-            data-preset="ice">
-            Ice
-          </button>
-          <button
-            class="preset-btn bg-purple-900/40 border border-purple-500/30 hover:bg-purple-800/60 text-xs py-1 rounded transition"
-            data-preset="alien">
-            Alien
-          </button>
-          <button
-            class="preset-btn bg-red-900/40 border border-red-500/30 hover:bg-red-800/60 text-xs py-1 rounded transition"
-            data-preset="molten">
-            Molten
-          </button>
-          <button
-            class="preset-btn bg-gray-800/40 border border-gray-500/30 hover:bg-gray-700/60 text-xs py-1 rounded transition"
-            data-preset="barren">
-            Barren
-          </button>
+    <!-- PLANET SHAPE GROUP -->
+    <details class="group mb-2" open>
+      <summary
+        class="flex justify-between items-center cursor-pointer list-none bg-white/5 p-2 rounded hover:bg-white/10 transition">
+        <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Planet Shape</span>
+        <span class="text-gray-500 group-open:rotate-180 transition-transform duration-200">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </span>
+      </summary>
+      <div class="space-y-4 p-2 pt-4">
+        <div>
+          <label class="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-2 block">Biome Preset</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button
+              class="preset-btn bg-green-900/40 border border-green-500/30 hover:bg-green-800/60 text-xs py-1 rounded transition"
+              data-preset="terra">Terra</button>
+            <button
+              class="preset-btn bg-yellow-900/40 border border-yellow-500/30 hover:bg-yellow-800/60 text-xs py-1 rounded transition"
+              data-preset="desert">Desert</button>
+            <button
+              class="preset-btn bg-cyan-900/40 border border-cyan-500/30 hover:bg-cyan-800/60 text-xs py-1 rounded transition"
+              data-preset="ice">Ice</button>
+            <button
+              class="preset-btn bg-purple-900/40 border border-purple-500/30 hover:bg-purple-800/60 text-xs py-1 rounded transition"
+              data-preset="alien">Alien</button>
+            <button
+              class="preset-btn bg-red-900/40 border border-red-500/30 hover:bg-red-800/60 text-xs py-1 rounded transition"
+              data-preset="molten">Molten</button>
+            <button
+              class="preset-btn bg-gray-800/40 border border-gray-500/30 hover:bg-gray-700/60 text-xs py-1 rounded transition"
+              data-preset="barren">Barren</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-gray-300">Seed Offset</label>
+            <span id="val-seed" class="text-xs text-gray-500">0</span>
+          </div>
+          <input type="range" min="0" max="1000" step="1" value="123" class="slider" id="seed" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-gray-300">Detail (Resolution)</label>
+            <span id="val-detail" class="text-xs text-gray-500">20</span>
+          </div>
+          <input type="range" min="10" max="60" step="1" value="30" class="slider" id="detail" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-gray-300">Roughness</label>
+            <span id="val-scale" class="text-xs text-gray-500">1.5</span>
+          </div>
+          <input type="range" min="0.1" max="5.0" step="0.1" value="1.5" class="slider" id="scale" />
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-gray-300">Relief (Height)</label>
+            <span id="val-height" class="text-xs text-gray-500">1.2</span>
+          </div>
+          <input type="range" min="0" max="3.0" step="0.1" value="1.2" class="slider" id="height" />
         </div>
       </div>
+    </details>
 
-      <div>
-        <div class="flex justify-between mb-1">
-          <label class="text-xs text-gray-300">Seed Offset</label>
-          <span id="val-seed" class="text-xs text-gray-500">0</span>
-        </div>
-        <input type="range" min="0" max="1000" step="1" value="123" class="slider" id="seed" />
-      </div>
-
-      <div>
-        <div class="flex justify-between mb-1">
-          <label class="text-xs text-gray-300">Detail (Resolution)</label>
-          <span id="val-detail" class="text-xs text-gray-500">20</span>
-        </div>
-        <input type="range" min="10" max="60" step="1" value="30" class="slider" id="detail" />
-      </div>
-
-      <div>
-        <div class="flex justify-between mb-1">
-          <label class="text-xs text-gray-300">Roughness</label>
-          <span id="val-scale" class="text-xs text-gray-500">1.5</span>
-        </div>
-        <input type="range" min="0.1" max="5.0" step="0.1" value="1.5" class="slider" id="scale" />
-      </div>
-
-      <div>
-        <div class="flex justify-between mb-1">
-          <label class="text-xs text-gray-300">Relief (Height)</label>
-          <span id="val-height" class="text-xs text-gray-500">1.2</span>
-        </div>
-        <input type="range" min="0" max="3.0" step="0.1" value="1.2" class="slider" id="height" />
-      </div>
-
-      <div class="border-t border-white/10 pt-4 space-y-6">
+    <!-- WATER & VEGETATION GROUP -->
+    <details class="group mb-2">
+      <summary
+        class="flex justify-between items-center cursor-pointer list-none bg-white/5 p-2 rounded hover:bg-white/10 transition">
+        <span class="text-xs font-bold text-blue-300 uppercase tracking-wider">Water & Vegetation</span>
+        <span class="text-gray-500 group-open:rotate-180 transition-transform duration-200">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </span>
+      </summary>
+      <div class="space-y-4 p-2 pt-4">
         <div>
           <div class="flex justify-between mb-1">
             <label class="text-xs text-blue-300">Water Level</label>
@@ -183,9 +197,21 @@
           <input type="range" min="0" max="200" step="10" value="50" class="slider" id="veg" />
         </div>
       </div>
+    </details>
 
-      <div class="border-t border-white/10 pt-4 space-y-4">
-        <label class="text-xs uppercase tracking-wider text-gray-400 font-semibold block">Atmosphere & Clouds</label>
+    <!-- ATMOSPHERE & CLOUDS GROUP -->
+    <details class="group mb-2">
+      <summary
+        class="flex justify-between items-center cursor-pointer list-none bg-white/5 p-2 rounded hover:bg-white/10 transition">
+        <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Atmosphere & Clouds</span>
+        <span class="text-gray-500 group-open:rotate-180 transition-transform duration-200">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </span>
+      </summary>
+      <div class="space-y-4 p-2 pt-4">
 
         <!-- HORIZON FOG CONTROLS -->
         <div class="bg-white/5 p-3 rounded-lg">
@@ -409,9 +435,21 @@
           <input type="range" min="0.0" max="30.0" step="0.5" value="30.0" class="slider" id="hfall" />
         </div>
       </div>
+    </details>
 
-      <div class="space-y-4 border-t border-white/10 pt-4">
-        <label class="text-xs uppercase tracking-wider text-gray-400 font-semibold block">System</label>
+    <!-- SYSTEM GROUP -->
+    <details class="group mb-2">
+      <summary
+        class="flex justify-between items-center cursor-pointer list-none bg-white/5 p-2 rounded hover:bg-white/10 transition">
+        <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">System</span>
+        <span class="text-gray-500 group-open:rotate-180 transition-transform duration-200">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </span>
+      </summary>
+      <div class="space-y-4 p-2 pt-4">
         <div class="flex justify-between mb-1">
           <label class="text-xs text-gray-300">Rotation Speed</label>
           <span id="val-speed" class="text-xs text-gray-500">0.0</span>
@@ -454,10 +492,21 @@
         </div>
         <input type="range" min="1.0" max="5.0" step="0.5" value="4.5" class="slider" id="stars" />
       </div>
+    </details>
 
-      <!-- CAMERA CONTROLS -->
-      <div class="border-t border-white/10 pt-4 space-y-2">
-        <label class="text-xs uppercase tracking-wider text-gray-400 font-semibold block">Camera</label>
+    <!-- CAMERA GROUP -->
+    <details class="group mb-2">
+      <summary
+        class="flex justify-between items-center cursor-pointer list-none bg-white/5 p-2 rounded hover:bg-white/10 transition">
+        <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Camera</span>
+        <span class="text-gray-500 group-open:rotate-180 transition-transform duration-200">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </span>
+      </summary>
+      <div class="space-y-2 p-2 pt-4">
         <div class="flex gap-2">
           <button id="cam-reset"
             class="flex-1 bg-white/5 hover:bg-white/10 text-[10px] py-2 rounded border border-white/10 transition text-gray-300 hover:text-white">
@@ -473,12 +522,14 @@
           </button>
         </div>
       </div>
+    </details>
+  </div>
 
-      <div class="mt-auto pt-6 text-[10px] text-gray-600 text-center">
-        Generated using Three.js & Simplex Noise.<br />
-        Left Click to Orbit • Scroll to Zoom • P to Pause
-      </div>
-    </div>
+  <div class="mt-auto pt-6 text-[10px] text-gray-600 text-center">
+    Generated using Three.js & Simplex Noise.<br />
+    Left Click to Orbit • Scroll to Zoom • P to Pause
+  </div>
+  </div>
   </div>
 
   <script type="importmap">
